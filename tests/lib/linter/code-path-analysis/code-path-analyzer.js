@@ -9,9 +9,9 @@
 // Requirements
 //------------------------------------------------------------------------------
 
-const assert = require("assert"),
-    fs = require("fs"),
-    path = require("path"),
+const assert = require("node:assert"),
+    fs = require("node:fs"),
+    path = require("node:path"),
     vk = require("eslint-visitor-keys"),
     { Linter } = require("../../../../lib/linter"),
     EventGeneratorTester = require("../../../../tools/internal-testers/event-generator-tester"),
@@ -31,7 +31,7 @@ const STANDARD_ESQUERY_OPTION = { visitorKeys: vk.KEYS, fallback: Traverser.getK
 
 const expectedPattern = /\/\*expected\s+((?:.|[\r\n])+?)\s*\*\//gu;
 const lineEndingPattern = /\r?\n/gu;
-const linter = new Linter();
+const linter = new Linter({ configType: "eslintrc" });
 
 /**
  * Extracts the content of `/*expected` comments from a given source code.
@@ -137,37 +137,6 @@ describe("CodePathAnalyzer", () => {
             assert(actual[1].thrownSegments[0] instanceof CodePathSegment);
         });
 
-        it("should have `currentSegments` as CodePathSegment[]", () => {
-            assert(Array.isArray(actual[0].currentSegments));
-            assert(Array.isArray(actual[1].currentSegments));
-            assert(actual[0].currentSegments.length === 0);
-            assert(actual[1].currentSegments.length === 0);
-
-            // there is the current segment in progress.
-            linter.defineRule("test", {
-                create() {
-                    let codePath = null;
-
-                    return {
-                        onCodePathStart(cp) {
-                            codePath = cp;
-                        },
-                        ReturnStatement() {
-                            assert(codePath.currentSegments.length === 1);
-                            assert(codePath.currentSegments[0] instanceof CodePathSegment);
-                        },
-                        ThrowStatement() {
-                            assert(codePath.currentSegments.length === 1);
-                            assert(codePath.currentSegments[0] instanceof CodePathSegment);
-                        }
-                    };
-                }
-            });
-            linter.verify(
-                "function foo(a) { if (a) return 0; else throw new Error(); }",
-                { rules: { test: 2 } }
-            );
-        });
     });
 
     describe("interface of code path segments", () => {

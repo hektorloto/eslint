@@ -53,8 +53,8 @@ ESLint custom parsers are a way to extend ESLint to support the linting of new l
 
 ESLint ships with a built-in JavaScript parser (Espree), but custom parsers allow you to lint other languages or to extend the linting capabilities of the built-in parser.
 
-For example, the custom parser [@typescript-eslint/parser](https://typescript-eslint.io/architecture/parser/) extends ESLint to lint TypeScript code.
+For example, the custom parser [@typescript-eslint/parser](https://typescript-eslint.io/packages/parser) extends ESLint to lint TypeScript code.
 
-Custom parsers **cannot** be included in a plugin, unlike the other extension types.
+Custom parsers can be also included in a plugin.
 
 To learn more about creating a custom parser, refer to [Custom Parsers](custom-parsers).

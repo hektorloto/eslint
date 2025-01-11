@@ -11,7 +11,9 @@ related_rules:
 
 Enforces consistent spacing before keywords.
 
-(removed) This rule was **removed** in ESLint v2.0 and **replaced** by the [keyword-spacing](keyword-spacing) rule.
+::: important
+This rule was removed in ESLint v2.0.0 and replaced by the [keyword-spacing](keyword-spacing) rule.
+:::
 
 (fixable) The `--fix` option on the [command line](../use/command-line-interface#--fix) automatically fixed problems reported by this rule.
 
@@ -47,7 +49,6 @@ Examples of **incorrect** code for this rule with the default `"always"` option:
 
 ```js
 /*eslint space-before-keywords: ["error", "always"]*/
-/*eslint-env es6*/
 
 if (foo) {
     // ...
@@ -66,11 +67,10 @@ function bar() {
 
 Examples of **correct** code for this rule with the default `"always"` option:
 
-::: correct { "ecmaFeatures": { "jsx": true } }
+::: correct { "parserOptions": { "ecmaFeatures": { "jsx": true } } }
 
 ```js
 /*eslint space-before-keywords: ["error", "always"]*/
-/*eslint-env es6*/
 
 if (foo) {
     // ...

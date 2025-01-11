@@ -2,109 +2,58 @@
 
 const js = require("@eslint/js");
 const jsdoc = require("eslint-plugin-jsdoc");
-const eslintComments = require("eslint-plugin-eslint-comments");
+const eslintCommentsPluginConfigs = require("@eslint-community/eslint-plugin-eslint-comments/configs");
 const unicorn = require("eslint-plugin-unicorn");
 
-/*
- * the plugins' configs are not updated to support the flat config,
- * need to manually update the `plugins` property
- */
-eslintComments.configs.recommended.plugins = { "eslint-comments": eslintComments };
-
 // extends eslint recommended config
+/**
+ * @type {import("eslint").Linter.Config[]}
+ */
 const jsConfigs = [js.configs.recommended, {
+    name: "eslint-config-eslint/js",
     rules: {
-        "array-bracket-spacing": "error",
         "array-callback-return": "error",
         "arrow-body-style": ["error", "as-needed"],
-        "arrow-parens": ["error", "as-needed"],
-        "arrow-spacing": "error",
-        indent: ["error", 4, { SwitchCase: 1 }],
-        "block-spacing": "error",
-        "brace-style": ["error", "1tbs"],
         camelcase: "error",
         "class-methods-use-this": "error",
-        "comma-dangle": "error",
-        "comma-spacing": "error",
-        "comma-style": ["error", "last"],
-        "computed-property-spacing": "error",
         "consistent-return": "error",
         curly: ["error", "all"],
         "default-case": "error",
         "default-case-last": "error",
         "default-param-last": "error",
-        "dot-location": ["error", "property"],
         "dot-notation": [
             "error",
             { allowKeywords: true }
         ],
-        "eol-last": "error",
         eqeqeq: "error",
-        "func-call-spacing": "error",
         "func-style": ["error", "declaration"],
-        "function-call-argument-newline": ["error", "consistent"],
-        "function-paren-newline": ["error", "consistent"],
-        "generator-star-spacing": "error",
         "grouped-accessor-pairs": "error",
         "guard-for-in": "error",
-        "key-spacing": ["error", { beforeColon: false, afterColon: true }],
-        "keyword-spacing": "error",
-        "lines-around-comment": ["error",
-            {
-                beforeBlockComment: true,
-                afterBlockComment: false,
-                beforeLineComment: true,
-                afterLineComment: false
-            }
-        ],
-        "max-len": ["error", 160,
-            {
-                ignoreComments: true,
-                ignoreUrls: true,
-                ignoreStrings: true,
-                ignoreTemplateLiterals: true,
-                ignoreRegExpLiterals: true
-            }
-        ],
-        "max-statements-per-line": "error",
         "new-cap": "error",
-        "new-parens": "error",
         "no-alert": "error",
         "no-array-constructor": "error",
         "no-caller": "error",
-        "no-confusing-arrow": "error",
         "no-console": "error",
-        "no-constant-binary-expression": "error",
         "no-constructor-return": "error",
         "no-else-return": ["error", { allowElseIf: false }
         ],
         "no-eval": "error",
         "no-extend-native": "error",
         "no-extra-bind": "error",
-        "no-floating-decimal": "error",
         "no-implied-eval": "error",
+        "no-inner-declarations": "error",
         "no-invalid-this": "error",
         "no-iterator": "error",
         "no-label-var": "error",
         "no-labels": "error",
         "no-lone-blocks": "error",
         "no-loop-func": "error",
-        "no-mixed-spaces-and-tabs": ["error", false],
-        "no-multi-spaces": "error",
         "no-multi-str": "error",
-        "no-multiple-empty-lines": [
-            "error",
-            {
-                max: 2,
-                maxBOF: 0,
-                maxEOF: 0
-            }
-        ],
         "no-nested-ternary": "error",
         "no-new": "error",
         "no-new-func": "error",
-        "no-new-object": "error",
         "no-new-wrappers": "error",
+        "no-object-constructor": "error",
         "no-octal-escape": "error",
         "no-param-reassign": "error",
         "no-proto": "error",
@@ -144,9 +93,7 @@ const jsConfigs = [js.configs.recommended, {
         "no-self-compare": "error",
         "no-sequences": "error",
         "no-shadow": "error",
-        "no-tabs": "error",
         "no-throw-literal": "error",
-        "no-trailing-spaces": "error",
         "no-undef": ["error", { typeof: true }],
         "no-undef-init": "error",
         "no-undefined": "error",
@@ -163,105 +110,46 @@ const jsConfigs = [js.configs.recommended, {
         }
         ],
         "no-use-before-define": "error",
+        "no-useless-assignment": "error",
         "no-useless-call": "error",
         "no-useless-computed-key": "error",
         "no-useless-concat": "error",
         "no-useless-constructor": "error",
         "no-useless-rename": "error",
         "no-useless-return": "error",
-        "no-whitespace-before-property": "error",
         "no-var": "error",
-        "object-curly-newline": ["error",
-            {
-                consistent: true,
-                multiline: true
-            }
-        ],
-        "object-curly-spacing": ["error", "always"],
-        "object-property-newline": ["error",
-            {
-                allowAllPropertiesOnSameLine: true
-            }
-        ],
         "object-shorthand": ["error",
             "always",
             {
                 avoidExplicitReturnArrows: true
             }
         ],
-        "one-var-declaration-per-line": "error",
         "operator-assignment": "error",
-        "operator-linebreak": "error",
-        "padding-line-between-statements": ["error",
-            {
-                blankLine: "always",
-                prev: ["const", "let", "var"],
-                next: "*"
-            },
-            {
-                blankLine: "any",
-                prev: ["const", "let", "var"],
-                next: ["const", "let", "var"]
-            }
-        ],
         "prefer-arrow-callback": "error",
         "prefer-const": "error",
         "prefer-exponentiation-operator": "error",
         "prefer-numeric-literals": "error",
+        "prefer-object-has-own": "error",
         "prefer-promise-reject-errors": "error",
         "prefer-regex-literals": "error",
         "prefer-rest-params": "error",
         "prefer-spread": "error",
         "prefer-template": "error",
-        quotes: ["error", "double", { avoidEscape: true }],
-        "quote-props": ["error", "as-needed"],
         radix: "error",
         "require-unicode-regexp": "error",
-        "rest-spread-spacing": "error",
-        semi: "error",
-        "semi-spacing": ["error",
-            {
-                before: false,
-                after: true
-            }
-        ],
-        "semi-style": "error",
-        "space-before-blocks": "error",
-        "space-before-function-paren": ["error",
-            {
-                anonymous: "never",
-                named: "never",
-                asyncArrow: "always"
-            }
-        ],
-        "space-in-parens": "error",
-        "space-infix-ops": "error",
-        "space-unary-ops": ["error",
-            {
-                words: true,
-                nonwords: false
-            }
-        ],
-        "spaced-comment": ["error",
-            "always",
-            {
-                exceptions: ["-"]
-            }
-        ],
         strict: ["error", "global"],
-        "switch-colon-spacing": "error",
         "symbol-description": "error",
-        "template-curly-spacing": ["error", "never"],
-        "template-tag-spacing": "error",
         "unicode-bom": "error",
-        "wrap-iife": "error",
-        "yield-star-spacing": "error",
         yoda: ["error", "never", { exceptRange: true }]
     }
 }];
 
 // extends eslint-plugin-jsdoc's recommended config
+/**
+ * @type {import("eslint").Linter.Config[]}
+ */
 const jsdocConfigs = [jsdoc.configs["flat/recommended"], {
+    name: "eslint-config-eslint/jsdoc",
     settings: {
         jsdoc: {
             mode: "typescript",
@@ -333,7 +221,7 @@ const jsdocConfigs = [jsdoc.configs["flat/recommended"], {
         "jsdoc/empty-tags": "error",
         "jsdoc/implements-on-classes": "error",
         "jsdoc/multiline-blocks": "error",
-        "jsdoc/no-multi-asterisks": "error",
+        "jsdoc/no-multi-asterisks": ["error", { allowWhitespace: true }],
         "jsdoc/require-jsdoc": ["error", { require: { ClassDeclaration: true } }],
         "jsdoc/require-param": "error",
         "jsdoc/require-param-description": "error",
@@ -352,7 +240,11 @@ const jsdocConfigs = [jsdoc.configs["flat/recommended"], {
 }];
 
 // extends eslint-plugin-unicorn's config
+/**
+ * @type {import("eslint").Linter.Config[]}
+ */
 const unicornConfigs = [{
+    name: "eslint-config-eslint/unicorn",
     plugins: { unicorn },
     rules: {
         "unicorn/prefer-array-find": "error",
@@ -360,6 +252,7 @@ const unicornConfigs = [{
         "unicorn/prefer-array-flat": "error",
         "unicorn/prefer-array-index-of": "error",
         "unicorn/prefer-array-some": "error",
+        "unicorn/prefer-at": "error",
         "unicorn/prefer-includes": "error",
         "unicorn/prefer-set-has": "error",
         "unicorn/prefer-string-slice": "error",
@@ -368,17 +261,24 @@ const unicornConfigs = [{
     }
 }];
 
-// extends eslint-plugin-eslint-comments's recommended config
-const eslintCommentsConfigs = [eslintComments.configs.recommended, {
+// extends @eslint-community/eslint-plugin-eslint-comments's recommended config
+/**
+ * @type {import("eslint").Linter.Config[]}
+ */
+const eslintCommentsConfigs = [eslintCommentsPluginConfigs.recommended, {
+    name: "eslint-config-eslint/eslint-comments",
     rules: {
-        "eslint-comments/disable-enable-pair": ["error"],
-        "eslint-comments/no-unused-disable": "error",
-        "eslint-comments/require-description": "error"
+        "@eslint-community/eslint-comments/disable-enable-pair": ["error"],
+        "@eslint-community/eslint-comments/no-unused-disable": "error",
+        "@eslint-community/eslint-comments/require-description": "error"
     }
 }];
 
+/**
+ * @type {import("eslint").Linter.Config[]}
+ */
 module.exports = [
-    { linterOptions: { reportUnusedDisableDirectives: true } },
+    { name: "eslint-config-eslint/base", linterOptions: { reportUnusedDisableDirectives: "error" } },
     ...jsConfigs,
     ...unicornConfigs,
     ...jsdocConfigs,

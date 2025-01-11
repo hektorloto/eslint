@@ -19,16 +19,16 @@ function foo() {
 
 ## Rule Details
 
-This rule is aimed at highlighting an unnecessary block of code following an `if` containing a return statement. As such, it will warn when it encounters an `else` following a chain of `if`s, all of them containing a `return` statement.
+This rule is aimed at highlighting an unnecessary block of code following an `if` containing a `return` statement. As such, it will warn when it encounters an `else` following a chain of `if`s, all of them containing a `return` statement.
 
 ## Options
 
 This rule has an object option:
 
-* `allowElseIf: true` (default) allows `else if` blocks after a return
-* `allowElseIf: false` disallows `else if` blocks after a return
+* `allowElseIf: true` (default) allows `else if` blocks after a `return`
+* `allowElseIf: false` disallows `else if` blocks after a `return`
 
-### `allowElseIf: true`
+###  allowElseIf: true
 
 Examples of **incorrect** code for this rule:
 
@@ -137,7 +137,7 @@ function foo4() {
 
 :::
 
-### `allowElseIf: false`
+### allowElseIf: false
 
 Examples of **incorrect** code for this rule:
 
