@@ -37,15 +37,15 @@ Examples of **incorrect** code for this rule:
 ```js
 /*eslint no-unmodified-loop-condition: "error"*/
 
-var node = something;
+let node = something;
 
 while (node) {
     doSomething(node);
 }
 node = other;
 
-for (var j = 0; j < items.length; ++i) {
-    doSomething(items[j]);
+for (let j = 0; j < 5;) {
+    doSomething(j);
 }
 
 while (node !== root) {
@@ -67,7 +67,7 @@ while (node) {
     node = node.parent;
 }
 
-for (var j = 0; j < items.length; ++j) {
+for (let j = 0; j < items.length; ++j) {
     doSomething(items[j]);
 }
 

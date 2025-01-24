@@ -79,7 +79,7 @@ window.bar = function() {};
 
 Examples of **correct** code for this rule with `"parserOptions": { "sourceType": "module" }` in the ESLint configuration:
 
-::: correct { "sourceType": "script" }
+::: correct { "sourceType": "module" }
 
 ```js
 /*eslint no-implicit-globals: "error"*/
@@ -118,12 +118,9 @@ Bar.prototype.baz = function () {
 
 This rule also disallows redeclarations of read-only global variables and assignments to read-only global variables.
 
-A read-only global variable can be a built-in ES global (e.g. `Array`), an environment specific global
-(e.g. `window` in the browser environment), or a global variable defined as `readonly` in the configuration file
-or in a `/*global */` comment.
+A read-only global variable can be a built-in ES global (e.g. `Array`), or a global variable defined as `readonly` in the configuration file or in a `/*global */` comment.
 
-* [Specifying Environments](../use/configure#specifying-environments)
-* [Specifying Globals](../use/configure#specifying-globals)
+See also: [Specifying Globals](../use/configure#specifying-globals)
 
 Examples of **incorrect** code for this rule:
 
@@ -264,6 +261,7 @@ Examples of **correct** code for `/* exported variableName */` operation:
 ::: correct { "sourceType": "script" }
 
 ```js
+/* eslint no-implicit-globals: error */
 /* exported global_var */
 
 var global_var = 42;

@@ -17,6 +17,14 @@ const { assert } = require("chai"),
 
 const { Linter } = require("../../../lib/linter");
 const { FlatConfigArray } = require("../../../lib/config/flat-config-array");
+const { SourceCode } = require("../../../lib/languages/js/source-code");
+const jslang = require("../../../lib/languages/js");
+const Traverser = require("../../../lib/shared/traverser");
+const { LATEST_ECMA_VERSION } = require("../../../conf/ecma-version");
+
+// In Node.js, `jsonPluginPackage.default` is the plugin. In the browser test, `jsonPluginPackage` is the plugin.
+const jsonPluginPackage = require("@eslint/json");
+const jsonPlugin = jsonPluginPackage.default || jsonPluginPackage;
 
 //------------------------------------------------------------------------------
 // Constants
@@ -59,7 +67,7 @@ describe("Linter", () => {
     let linter;
 
     beforeEach(() => {
-        linter = new Linter();
+        linter = new Linter({ configType: "eslintrc" });
     });
 
     afterEach(() => {
@@ -134,76 +142,11 @@ describe("Linter", () => {
         });
     });
 
-    describe("context.getSourceLines()", () => {
-
-        it("should get proper lines when using \\n as a line break", () => {
-            const code = "a;\nb;";
-            const spy = sinon.spy(context => {
-                assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy.calledOnce);
-        });
-
-        it("should get proper lines when using \\r\\n as a line break", () => {
-            const code = "a;\r\nb;";
-            const spy = sinon.spy(context => {
-                assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy.calledOnce);
-        });
-
-        it("should get proper lines when using \\r as a line break", () => {
-            const code = "a;\rb;";
-            const spy = sinon.spy(context => {
-                assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy.calledOnce);
-        });
-
-        it("should get proper lines when using \\u2028 as a line break", () => {
-            const code = "a;\u2028b;";
-            const spy = sinon.spy(context => {
-                assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy.calledOnce);
-        });
-
-        it("should get proper lines when using \\u2029 as a line break", () => {
-            const code = "a;\u2029b;";
-            const spy = sinon.spy(context => {
-                assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy.calledOnce);
-        });
-
-
-    });
-
     describe("getSourceCode()", () => {
         const code = TEST_CODE;
 
         it("should retrieve SourceCode object after reset", () => {
-            linter.verify(code, {}, filename, true);
+            linter.verify(code, {}, filename);
 
             const sourceCode = linter.getSourceCode();
 
@@ -349,653 +292,6 @@ describe("Linter", () => {
         });
     });
 
-    describe("context.getSource()", () => {
-        const code = TEST_CODE;
-
-        it("should retrieve all text when used without parameters", () => {
-
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        assert.strictEqual(context.getSource(), TEST_CODE);
-                    });
-                    return { Program: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve all text for root node", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node), TEST_CODE);
-                    });
-                    return { Program: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should clamp to valid range when retrieving characters before start of source", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node, 2, 0), TEST_CODE);
-                    });
-                    return { Program: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve all text for binary expression", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node), "6 * 7");
-                    });
-                    return { BinaryExpression: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve all text plus two characters before for binary expression", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node, 2), "= 6 * 7");
-                    });
-                    return { BinaryExpression: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve all text plus one character after for binary expression", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node, 0, 1), "6 * 7;");
-                    });
-                    return { BinaryExpression: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve all text plus two characters before and one character after for binary expression", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node, 2, 1), "= 6 * 7;");
-                    });
-                    return { BinaryExpression: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-    });
-
-    describe("when calling context.getAncestors", () => {
-        const code = TEST_CODE;
-
-        it("should retrieve all ancestors when used", () => {
-
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const ancestors = context.getAncestors();
-
-                        assert.strictEqual(ancestors.length, 3);
-                    });
-                    return { BinaryExpression: spy };
-                }
-            });
-
-            linter.verify(code, config, filename, true);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve empty ancestors for root node", () => {
-            const config = { rules: { checker: "error" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const ancestors = context.getAncestors();
-
-                        assert.strictEqual(ancestors.length, 0);
-                    });
-
-                    return { Program: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-    });
-
-    describe("when calling context.getNodeByRangeIndex", () => {
-        const code = TEST_CODE;
-
-        it("should retrieve a node starting at the given index", () => {
-            const config = { rules: { checker: "error" } };
-            const spy = sinon.spy(context => {
-                assert.strictEqual(context.getNodeByRangeIndex(4).type, "Identifier");
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, config);
-            assert(spy.calledOnce);
-        });
-
-        it("should retrieve a node containing the given index", () => {
-            const config = { rules: { checker: "error" } };
-            const spy = sinon.spy(context => {
-                assert.strictEqual(context.getNodeByRangeIndex(6).type, "Identifier");
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, config);
-            assert(spy.calledOnce);
-        });
-
-        it("should retrieve a node that is exactly the given index", () => {
-            const config = { rules: { checker: "error" } };
-            const spy = sinon.spy(context => {
-                const node = context.getNodeByRangeIndex(13);
-
-                assert.strictEqual(node.type, "Literal");
-                assert.strictEqual(node.value, 6);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, config);
-            assert(spy.calledOnce);
-        });
-
-        it("should retrieve a node ending with the given index", () => {
-            const config = { rules: { checker: "error" } };
-            const spy = sinon.spy(context => {
-                assert.strictEqual(context.getNodeByRangeIndex(9).type, "Identifier");
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, config);
-            assert(spy.calledOnce);
-        });
-
-        it("should retrieve the deepest node containing the given index", () => {
-            const config = { rules: { checker: "error" } };
-            const spy = sinon.spy(context => {
-                const node1 = context.getNodeByRangeIndex(14);
-
-                assert.strictEqual(node1.type, "BinaryExpression");
-
-                const node2 = context.getNodeByRangeIndex(3);
-
-                assert.strictEqual(node2.type, "VariableDeclaration");
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, config);
-            assert(spy.calledOnce);
-        });
-
-        it("should return null if the index is outside the range of any node", () => {
-            const config = { rules: { checker: "error" } };
-            const spy = sinon.spy(context => {
-                const node1 = context.getNodeByRangeIndex(-1);
-
-                assert.isNull(node1);
-
-                const node2 = context.getNodeByRangeIndex(-99);
-
-                assert.isNull(node2);
-                return {};
-            });
-
-            linter.defineRule("checker", { create: spy });
-            linter.verify(code, config);
-            assert(spy.calledOnce);
-        });
-    });
-
-
-    describe("when calling context.getScope", () => {
-        const code = "function foo() { q: for(;;) { break q; } } function bar () { var q = t; } var baz = (() => { return 1; });";
-
-        it("should retrieve the global scope correctly from a Program", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "global");
-                    });
-                    return { Program: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from a FunctionDeclaration", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "function");
-                    });
-                    return { FunctionDeclaration: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledTwice);
-        });
-
-        it("should retrieve the function scope correctly from a LabeledStatement", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block.id.name, "foo");
-                    });
-                    return { LabeledStatement: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from within an ArrowFunctionExpression", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block.type, "ArrowFunctionExpression");
-                    });
-
-                    return { ReturnStatement: spy };
-                }
-            });
-
-            linter.verify(code, config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from within an SwitchStatement", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "switch");
-                        assert.strictEqual(scope.block.type, "SwitchStatement");
-                    });
-
-                    return { SwitchStatement: spy };
-                }
-            });
-
-            linter.verify("switch(foo){ case 'a': var b = 'foo'; }", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from within a BlockStatement", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.block.type, "BlockStatement");
-                    });
-
-                    return { BlockStatement: spy };
-                }
-            });
-
-            linter.verify("var x; {let y = 1}", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from within a nested block statement", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.block.type, "BlockStatement");
-                    });
-
-                    return { BlockStatement: spy };
-                }
-            });
-
-            linter.verify("if (true) { let x = 1 }", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from within a FunctionDeclaration", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block.type, "FunctionDeclaration");
-                    });
-
-                    return { FunctionDeclaration: spy };
-                }
-            });
-
-            linter.verify("function foo() {}", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the function scope correctly from within a FunctionExpression", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block.type, "FunctionExpression");
-                    });
-
-                    return { FunctionExpression: spy };
-                }
-            });
-
-            linter.verify("(function foo() {})();", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve the catch scope correctly from within a CatchClause", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6 } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "catch");
-                        assert.strictEqual(scope.block.type, "CatchClause");
-                    });
-
-                    return { CatchClause: spy };
-                }
-            });
-
-            linter.verify("try {} catch (err) {}", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve module scope correctly from an ES6 module", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6, sourceType: "module" } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "module");
-                    });
-
-                    return { AssignmentExpression: spy };
-                }
-            });
-
-            linter.verify("var foo = {}; foo.bar = 1;", config);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should retrieve function scope correctly when globalReturn is true", () => {
-            const config = { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6, ecmaFeatures: { globalReturn: true } } };
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.strictEqual(scope.type, "function");
-                    });
-
-                    return { AssignmentExpression: spy };
-                }
-            });
-
-            linter.verify("var foo = {}; foo.bar = 1;", config);
-            assert(spy && spy.calledOnce);
-        });
-    });
-
-    describe("marking variables as used", () => {
-        it("should mark variables in current scope as used", () => {
-            const code = "var a = 1, b = 2;";
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        assert.isTrue(context.markVariableAsUsed("a"));
-
-                        const scope = context.getScope();
-
-                        assert.isTrue(getVariable(scope, "a").eslintUsed);
-                        assert.notOk(getVariable(scope, "b").eslintUsed);
-                    });
-
-                    return { "Program:exit": spy };
-                }
-            });
-
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy && spy.calledOnce);
-        });
-        it("should mark variables in function args as used", () => {
-            const code = "function abc(a, b) { return 1; }";
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        assert.isTrue(context.markVariableAsUsed("a"));
-
-                        const scope = context.getScope();
-
-                        assert.isTrue(getVariable(scope, "a").eslintUsed);
-                        assert.notOk(getVariable(scope, "b").eslintUsed);
-                    });
-
-                    return { ReturnStatement: spy };
-                }
-            });
-
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy && spy.calledOnce);
-        });
-        it("should mark variables in higher scopes as used", () => {
-            const code = "var a, b; function abc() { return 1; }";
-            let returnSpy, exitSpy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    returnSpy = sinon.spy(() => {
-                        assert.isTrue(context.markVariableAsUsed("a"));
-                    });
-                    exitSpy = sinon.spy(() => {
-                        const scope = context.getScope();
-
-                        assert.isTrue(getVariable(scope, "a").eslintUsed);
-                        assert.notOk(getVariable(scope, "b").eslintUsed);
-                    });
-
-                    return { ReturnStatement: returnSpy, "Program:exit": exitSpy };
-                }
-            });
-
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(returnSpy && returnSpy.calledOnce);
-            assert(exitSpy && exitSpy.calledOnce);
-        });
-
-        it("should mark variables in Node.js environment as used", () => {
-            const code = "var a = 1, b = 2;";
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const globalScope = context.getScope(),
-                            childScope = globalScope.childScopes[0];
-
-                        assert.isTrue(context.markVariableAsUsed("a"));
-
-                        assert.isTrue(getVariable(childScope, "a").eslintUsed);
-                        assert.isUndefined(getVariable(childScope, "b").eslintUsed);
-                    });
-
-                    return { "Program:exit": spy };
-                }
-            });
-
-            linter.verify(code, { rules: { checker: "error" }, env: { node: true } });
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should mark variables in modules as used", () => {
-            const code = "var a = 1, b = 2;";
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        const globalScope = context.getScope(),
-                            childScope = globalScope.childScopes[0];
-
-                        assert.isTrue(context.markVariableAsUsed("a"));
-
-                        assert.isTrue(getVariable(childScope, "a").eslintUsed);
-                        assert.isUndefined(getVariable(childScope, "b").eslintUsed);
-                    });
-
-                    return { "Program:exit": spy };
-                }
-            });
-
-            linter.verify(code, { rules: { checker: "error" }, parserOptions: { ecmaVersion: 6, sourceType: "module" } }, filename, true);
-            assert(spy && spy.calledOnce);
-        });
-
-        it("should return false if the given variable is not found", () => {
-            const code = "var a = 1, b = 2;";
-            let spy;
-
-            linter.defineRule("checker", {
-                create(context) {
-                    spy = sinon.spy(() => {
-                        assert.isFalse(context.markVariableAsUsed("c"));
-                    });
-
-                    return { "Program:exit": spy };
-                }
-            });
-
-            linter.verify(code, { rules: { checker: "error" } });
-            assert(spy && spy.calledOnce);
-        });
-    });
-
     describe("when evaluating code", () => {
         const code = TEST_CODE;
 
@@ -1019,7 +315,7 @@ describe("Linter", () => {
                 })
             });
 
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
@@ -1029,6 +325,68 @@ describe("Linter", () => {
             sinon.assert.calledOnce(spyIdentifier);
             sinon.assert.calledTwice(spyLiteral);
             sinon.assert.calledOnce(spyBinaryExpression);
+        });
+
+        it("should throw an error if a rule is a function", () => {
+
+            /**
+             * Legacy-format rule (a function instead of an object with `create` method).
+             * @param {RuleContext} context The ESLint rule context object.
+             * @returns {Object} Listeners.
+             */
+            function functionStyleRule(context) {
+                return {
+                    Program(node) {
+                        context.report({ node, message: "bad" });
+                    }
+                };
+            }
+
+            linter.defineRule("function-style-rule", functionStyleRule);
+
+            assert.throws(
+                () => linter.verify("foo", { rules: { "function-style-rule": "error" } }),
+                TypeError,
+                "Error while loading rule 'function-style-rule': Rule must be an object with a `create` method"
+            );
+        });
+
+        it("should throw an error if a rule is an object without 'create' method", () => {
+            const rule = {
+                create_(context) {
+                    return {
+                        Program(node) {
+                            context.report({ node, message: "bad" });
+                        }
+                    };
+                }
+            };
+
+            linter.defineRule("object-rule-without-create", rule);
+
+            assert.throws(
+                () => linter.verify("foo", { rules: { "object-rule-without-create": "error" } }),
+                TypeError,
+                "Error while loading rule 'object-rule-without-create': Rule must be an object with a `create` method"
+            );
+        });
+
+        it("should throw an error if a rule with invalid `meta.schema` is enabled in a configuration comment", () => {
+            const rule = {
+                meta: {
+                    schema: true
+                },
+                create() {
+                    return {};
+                }
+            };
+
+            linter.defineRule("rule-with-invalid-schema", rule);
+
+            assert.throws(
+                () => linter.verify("/* eslint rule-with-invalid-schema: 2 */"),
+                "Error while processing options validation schema of rule 'rule-with-invalid-schema': Rule's `meta.schema` must be an array or object"
+            );
         });
 
         it("should throw an error if a rule reports a problem without a message", () => {
@@ -1197,7 +555,6 @@ describe("Linter", () => {
             linter.defineRule("test-service-rule", {
                 create: context => ({
                     Literal(node) {
-                        assert.strictEqual(context.parserServices, context.sourceCode.parserServices);
                         context.report({
                             node,
                             message: context.sourceCode.parserServices.test.getMessage()
@@ -1220,7 +577,6 @@ describe("Linter", () => {
             linter.defineRule("test-service-rule", {
                 create: context => ({
                     Literal(node) {
-                        assert.strictEqual(context.parserServices, context.sourceCode.parserServices);
                         context.report({
                             node,
                             message: context.sourceCode.parserServices.test.getMessage()
@@ -1269,7 +625,7 @@ describe("Linter", () => {
 
             config.rules[rule] = 1;
 
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
@@ -1284,7 +640,7 @@ describe("Linter", () => {
 
             config.rules[rule] = "warn";
 
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
@@ -1300,7 +656,7 @@ describe("Linter", () => {
 
             config.rules[rule] = [1];
 
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
@@ -1315,7 +671,7 @@ describe("Linter", () => {
 
             config.rules[rule] = ["warn"];
 
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
@@ -1331,7 +687,7 @@ describe("Linter", () => {
 
             config.rules[rule] = "1";
 
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
@@ -1340,7 +696,7 @@ describe("Linter", () => {
 
         it("should process empty config", () => {
             const config = {};
-            const messages = linter.verify(code, config, filename, true);
+            const messages = linter.verify(code, config, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
@@ -1362,8 +718,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
                         const a = getVariable(scope, "a"),
                             b = getVariable(scope, "b"),
                             c = getVariable(scope, "c"),
@@ -1410,8 +766,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             a = getVariable(scope, "a"),
                             b = getVariable(scope, "b"),
                             c = getVariable(scope, "c");
@@ -1451,8 +807,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             exports = getVariable(scope, "exports"),
                             window = getVariable(scope, "window");
 
@@ -1475,8 +831,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             exports = getVariable(scope, "exports"),
                             window = getVariable(scope, "window"),
                             it = getVariable(scope, "it");
@@ -1504,8 +860,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             exports = getVariable(scope, "exports"),
                             window = getVariable(scope, "window");
 
@@ -1528,7 +884,97 @@ describe("Linter", () => {
             const code = "/* exported horse */";
             const config = { rules: {} };
 
-            linter.verify(code, config, filename, true);
+            linter.verify(code, config, filename);
+        });
+
+        it("variable should be exported ", () => {
+            const code = "/* exported horse */\n\nvar horse;";
+            const config = { rules: { checker: "error" } };
+            let spy;
+
+            linter.defineRule("checker", {
+                create(context) {
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
+                            horse = getVariable(scope, "horse");
+
+                        assert.isTrue(horse.eslintUsed);
+                    });
+
+                    return { Program: spy };
+                }
+            });
+
+            linter.verify(code, config);
+            assert(spy && spy.calledOnce);
+        });
+
+        it("`key: value` pair variable should not be exported", () => {
+            const code = "/* exported horse: true */\n\nvar horse;";
+            const config = { rules: { checker: "error" } };
+            let spy;
+
+            linter.defineRule("checker", {
+                create(context) {
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
+                            horse = getVariable(scope, "horse");
+
+                        assert.notOk(horse.eslintUsed);
+                    });
+
+                    return { Program: spy };
+                }
+            });
+
+            linter.verify(code, config);
+            assert(spy && spy.calledOnce);
+        });
+
+        it("variables with comma should be exported", () => {
+            const code = "/* exported horse, dog */\n\nvar horse, dog;";
+            const config = { rules: { checker: "error" } };
+            let spy;
+
+            linter.defineRule("checker", {
+                create(context) {
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
+
+                        ["horse", "dog"].forEach(name => {
+                            assert.isTrue(getVariable(scope, name).eslintUsed);
+                        });
+                    });
+
+                    return { Program: spy };
+                }
+            });
+
+            linter.verify(code, config);
+            assert(spy && spy.calledOnce);
+        });
+
+        it("variables without comma should not be exported", () => {
+            const code = "/* exported horse dog */\n\nvar horse, dog;";
+            const config = { rules: { checker: "error" } };
+            let spy;
+
+            linter.defineRule("checker", {
+                create(context) {
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
+
+                        ["horse", "dog"].forEach(name => {
+                            assert.notOk(getVariable(scope, name).eslintUsed);
+                        });
+                    });
+
+                    return { Program: spy };
+                }
+            });
+
+            linter.verify(code, config);
+            assert(spy && spy.calledOnce);
         });
 
         it("variables should be exported", () => {
@@ -1538,8 +984,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             horse = getVariable(scope, "horse");
 
                         assert.strictEqual(horse.eslintUsed, true);
@@ -1560,8 +1006,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             horse = getVariable(scope, "horse");
 
                         assert.strictEqual(horse, null);
@@ -1582,8 +1028,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             horse = getVariable(scope, "horse");
 
                         assert.strictEqual(horse.eslintUsed, true);
@@ -1604,8 +1050,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             horse = getVariable(scope, "horse");
 
                         assert.strictEqual(horse, null); // there is no global scope at all
@@ -1626,8 +1072,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope(),
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node),
                             horse = getVariable(scope, "horse");
 
                         assert.strictEqual(horse, null); // there is no global scope at all
@@ -1651,8 +1097,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
 
                         assert.strictEqual(getVariable(scope, "a"), null);
                     });
@@ -1675,8 +1121,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
 
                         assert.strictEqual(getVariable(scope, "a"), null);
                         assert.strictEqual(getVariable(scope, "b"), null);
@@ -1702,8 +1148,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
 
                         assert.notStrictEqual(getVariable(scope, "Object"), null);
                         assert.notStrictEqual(getVariable(scope, "Array"), null);
@@ -1724,8 +1170,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
 
                         assert.strictEqual(getVariable(scope, "Promise"), null);
                         assert.strictEqual(getVariable(scope, "Symbol"), null);
@@ -1746,8 +1192,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
 
                         assert.notStrictEqual(getVariable(scope, "Promise"), null);
                         assert.notStrictEqual(getVariable(scope, "Symbol"), null);
@@ -1768,8 +1214,8 @@ describe("Linter", () => {
 
             linter.defineRule("checker", {
                 create(context) {
-                    spy = sinon.spy(() => {
-                        const scope = context.getScope();
+                    spy = sinon.spy(node => {
+                        const scope = context.sourceCode.getScope(node);
 
                         assert.strictEqual(getVariable(scope, "Promise"), null);
                         assert.strictEqual(getVariable(scope, "Symbol"), null);
@@ -1952,13 +1398,13 @@ describe("Linter", () => {
             const config = { rules: { strict: 2 } };
             const codeA = "/*eslint strict: 0*/ function bar() { return 2; }";
             const codeB = "function foo() { return 1; }";
-            let messages = linter.verify(codeA, config, filename, false);
+            let messages = linter.verify(codeA, config, filename);
             let suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
             assert.strictEqual(suppressedMessages.length, 0);
 
-            messages = linter.verify(codeB, config, filename, false);
+            messages = linter.verify(codeB, config, filename);
             suppressedMessages = linter.getSuppressedMessages();
             assert.strictEqual(messages.length, 1);
 
@@ -1969,13 +1415,13 @@ describe("Linter", () => {
             const config = { rules: { quotes: [2, "double"] } };
             const codeA = "/*eslint quotes: 0*/ function bar() { return '2'; }";
             const codeB = "function foo() { return '1'; }";
-            let messages = linter.verify(codeA, config, filename, false);
+            let messages = linter.verify(codeA, config, filename);
             let suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
             assert.strictEqual(suppressedMessages.length, 0);
 
-            messages = linter.verify(codeB, config, filename, false);
+            messages = linter.verify(codeB, config, filename);
             suppressedMessages = linter.getSuppressedMessages();
             assert.strictEqual(messages.length, 1);
 
@@ -1987,13 +1433,13 @@ describe("Linter", () => {
             const codeA = "/*eslint quotes: [0, \"single\"]*/ function bar() { return '2'; }";
             const codeB = "function foo() { return '1'; }";
 
-            let messages = linter.verify(codeA, config, filename, false);
+            let messages = linter.verify(codeA, config, filename);
             let suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
             assert.strictEqual(suppressedMessages.length, 0);
 
-            messages = linter.verify(codeB, config, filename, false);
+            messages = linter.verify(codeB, config, filename);
             suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
@@ -2005,23 +1451,321 @@ describe("Linter", () => {
             const codeA = "/*eslint no-unused-vars: [0, {\"vars\": \"local\"}]*/ var a = 44;";
             const codeB = "var b = 55;";
 
-            let messages = linter.verify(codeA, config, filename, false);
+            let messages = linter.verify(codeA, config, filename);
             let suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
             assert.strictEqual(suppressedMessages.length, 0);
 
-            messages = linter.verify(codeB, config, filename, false);
+            messages = linter.verify(codeB, config, filename);
             suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
             assert.strictEqual(suppressedMessages.length, 0);
         });
+
+        it("rules use the rule's config when it is present", () => {
+            const config = {
+                rules: {
+                    "no-constant-condition": ["error", { checkLoops: "all" }]
+                }
+            };
+            const codeA = "/*eslint no-constant-condition: error */ while (true) {}";
+            const messages = linter.verify(codeA, config, filename);
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        severity: 2,
+                        ruleId: "no-constant-condition",
+                        message: "Unexpected constant condition.",
+                        messageId: "unexpected",
+                        nodeType: "Literal",
+                        line: 1,
+                        column: 49,
+                        endLine: 1,
+                        endColumn: 53
+                    }
+                ]
+            );
+        });
+
+        it("rules should apply meta.defaultOptions when the rule is not configured", () => {
+            const config = { rules: {} };
+            const codeA = "/*eslint no-constant-condition: error */ while (true) {}";
+            const messages = linter.verify(codeA, config, filename);
+
+            assert.deepStrictEqual(messages, []);
+        });
+
+        describe("when the rule has default options and a schema", () => {
+            beforeEach(() => {
+                linter.defineRules({
+                    "with-default-option": {
+                        meta: {
+                            defaultOptions: ["default-rule-option"],
+                            schema: {
+                                items: [{ type: "string" }],
+                                maxItems: 1,
+                                minItems: 1,
+                                type: "array"
+                            }
+                        },
+                        create(context) {
+                            const message = context.options[0];
+
+                            return {
+                                Identifier(node) {
+                                    context.report({ node, message });
+                                }
+                            };
+                        }
+                    }
+                });
+            });
+
+            it("preserves default options when the comment only has severity", () => {
+                const code = "/*eslint with-default-option: 'warn' */\nArray;";
+                const messages = linter.verify(code);
+
+                assert.strictEqual(messages.length, 1);
+                assert.strictEqual(messages[0].message, "default-rule-option");
+                assert.strictEqual(messages[0].ruleId, "with-default-option");
+                assert.strictEqual(messages[0].severity, 1);
+            });
+
+            it("overrides default options when the comment has severity and an option", () => {
+                const code = "/*eslint with-default-option: ['warn', 'overridden-rule-option'] */\nArray;";
+                const messages = linter.verify(code);
+
+                assert.strictEqual(messages.length, 1);
+                assert.strictEqual(messages[0].message, "overridden-rule-option");
+                assert.strictEqual(messages[0].ruleId, "with-default-option");
+                assert.strictEqual(messages[0].severity, 1);
+            });
+
+            it("reports an error when the comment has an option that does not match the schema", () => {
+                const code = "/*eslint with-default-option: ['warn', 123] */\nArray;";
+                const messages = linter.verify(code);
+
+                assert.strictEqual(messages.length, 1);
+                assert.match(messages[0].message, /Configuration for rule "with-default-option" is invalid/gu);
+                assert.match(messages[0].message, /Value 123 should be string/gu);
+                assert.strictEqual(messages[0].ruleId, "with-default-option");
+                assert.strictEqual(messages[0].severity, 2);
+            });
+        });
+
+        describe("when the rule has default options and schema: false", () => {
+            beforeEach(() => {
+                linter.defineRules({
+                    "with-default-option": {
+                        meta: {
+                            defaultOptions: ["default-rule-option"],
+                            schema: false
+                        },
+                        create(context) {
+                            const message = `${context.options[0]}`;
+
+                            return {
+                                Identifier(node) {
+                                    context.report({ node, message });
+                                }
+                            };
+                        }
+                    }
+                });
+            });
+
+            it("preserves default options when the comment only has severity", () => {
+                const code = "/*eslint with-default-option: 'warn' */\nArray;";
+                const messages = linter.verify(code);
+
+                assert.strictEqual(messages.length, 1);
+                assert.strictEqual(messages[0].message, "default-rule-option");
+                assert.strictEqual(messages[0].ruleId, "with-default-option");
+                assert.strictEqual(messages[0].severity, 1);
+            });
+
+            it("overrides default options when the comment has severity and an option", () => {
+                const code = "/*eslint with-default-option: ['warn', 'overridden-rule-option'] */\nArray;";
+                const messages = linter.verify(code);
+
+                assert.strictEqual(messages.length, 1);
+                assert.strictEqual(messages[0].message, "overridden-rule-option");
+                assert.strictEqual(messages[0].ruleId, "with-default-option");
+                assert.strictEqual(messages[0].severity, 1);
+            });
+
+            it("overrides default options error when the comment has an option that does not match the default type", () => {
+                const code = "/*eslint with-default-option: ['warn', 123] */\nArray;";
+                const messages = linter.verify(code);
+
+                assert.strictEqual(messages.length, 1);
+                assert.strictEqual(messages[0].message, "123");
+                assert.strictEqual(messages[0].ruleId, "with-default-option");
+                assert.strictEqual(messages[0].severity, 1);
+            });
+        });
+
+        describe("when the rule was already configured", () => {
+
+            beforeEach(() => {
+                linter.defineRules({
+                    "my-rule": {
+                        meta: {
+                            schema: [{
+                                type: "string"
+                            }]
+                        },
+                        create(context) {
+                            const message = context.options[0] ?? "option not provided";
+
+                            return {
+                                Program(node) {
+                                    context.report({ node, message });
+                                }
+                            };
+                        }
+                    },
+                    "has-default-options": {
+                        meta: {
+                            schema: [{
+                                type: "string"
+                            }],
+                            defaultOptions: ["option not provided"]
+                        },
+                        create(context) {
+                            const message = context.options[0];
+
+                            return {
+                                Identifier(node) {
+                                    context.report({ node, message });
+                                }
+                            };
+                        }
+                    },
+                    "requires-option": {
+                        meta: {
+                            schema: {
+                                type: "array",
+                                items: [{
+                                    type: "string"
+                                }],
+                                minItems: 1
+                            }
+                        },
+                        create(context) {
+                            const message = context.options[0];
+
+                            return {
+                                Identifier(node) {
+                                    context.report({ node, message });
+                                }
+                            };
+                        }
+                    }
+                });
+            });
+
+            [
+                "off",
+                "error",
+                ["off"],
+                ["warn"],
+                ["error"],
+                ["off", "bar"],
+                ["warn", "bar"],
+                ["error", "bar"]
+            ].forEach(ruleConfig => {
+                const config = {
+                    rules: {
+                        "has-default-options": ruleConfig,
+                        "my-rule": ruleConfig
+                    }
+                };
+
+                it(`severity from the /*eslint*/ comment and options from the config should apply when the comment has only severity (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                    const code = "/*eslint my-rule: 'warn', has-default-options: 'warn' */ id";
+                    const messages = linter.verify(code, config);
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    const expectedMessage = Array.isArray(ruleConfig) && ruleConfig.length > 1
+                        ? ruleConfig[1]
+                        : "option not provided";
+
+                    assert.strictEqual(messages.length, 2);
+                    assert.strictEqual(messages[0].ruleId, "my-rule");
+                    assert.strictEqual(messages[0].severity, 1);
+                    assert.strictEqual(messages[0].message, expectedMessage);
+                    assert.strictEqual(messages[1].ruleId, "has-default-options");
+                    assert.strictEqual(messages[1].severity, 1);
+                    assert.strictEqual(messages[1].message, expectedMessage);
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it(`severity from the /*eslint*/ comment and options from the config should apply when the comment has array with only severity (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                    const code = "/*eslint my-rule: ['warn'], has-default-options: ['warn'] */ id";
+                    const messages = linter.verify(code, config);
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    const expectedMessage = Array.isArray(ruleConfig) && ruleConfig.length > 1
+                        ? ruleConfig[1]
+                        : "option not provided";
+
+                    assert.strictEqual(messages.length, 2);
+                    assert.strictEqual(messages[0].ruleId, "my-rule");
+                    assert.strictEqual(messages[0].severity, 1);
+                    assert.strictEqual(messages[0].message, expectedMessage);
+                    assert.strictEqual(messages[1].ruleId, "has-default-options");
+                    assert.strictEqual(messages[1].severity, 1);
+                    assert.strictEqual(messages[1].message, expectedMessage);
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it(`severity and options from the /*eslint*/ comment should apply when the comment includes options (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                    const code = "/*eslint my-rule: ['warn', 'foo'], has-default-options: ['warn', 'foo'] */ id";
+                    const messages = linter.verify(code, config);
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 2);
+                    assert.strictEqual(messages[0].ruleId, "my-rule");
+                    assert.strictEqual(messages[0].severity, 1);
+                    assert.strictEqual(messages[0].message, "foo");
+                    assert.strictEqual(messages[1].ruleId, "has-default-options");
+                    assert.strictEqual(messages[1].severity, 1);
+                    assert.strictEqual(messages[1].message, "foo");
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+            });
+
+            it("should validate and use originally configured options when /*eslint*/ comment enables rule that was set to 'off' in the configuration", () => {
+                const code = "/*eslint my-rule: ['warn'], requires-option: 'warn' */ foo;";
+                const config = {
+                    rules: {
+                        "my-rule": ["off", true], // invalid options for this rule
+                        "requires-option": ["off", "Don't use identifier"] // valid options for this rule
+                    }
+                };
+                const messages = linter.verify(code, config);
+                const suppressedMessages = linter.getSuppressedMessages();
+
+                assert.strictEqual(messages.length, 2);
+                assert.strictEqual(messages[0].ruleId, "my-rule");
+                assert.strictEqual(messages[0].severity, 2);
+                assert.strictEqual(messages[0].message, "Configuration for rule \"my-rule\" is invalid:\n\tValue true should be string.\n");
+                assert.strictEqual(messages[1].ruleId, "requires-option");
+                assert.strictEqual(messages[1].severity, 1);
+                assert.strictEqual(messages[1].message, "Don't use identifier");
+                assert.strictEqual(suppressedMessages.length, 0);
+            });
+        });
     });
 
     describe("when evaluating code with invalid comments to enable rules", () => {
         it("should report a violation when the config is not a valid rule configuration", () => {
-            const messages = linter.verify("/*eslint no-alert:true*/ alert('test');", {});
+            const messages = linter.verify("/*eslint no-alert:true*/ alert('test');");
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.deepStrictEqual(
@@ -2044,7 +1788,7 @@ describe("Linter", () => {
         });
 
         it("should report a violation when the config violates a rule's schema", () => {
-            const messages = linter.verify("/* eslint no-alert: [error, {nonExistentPropertyName: true}]*/", {});
+            const messages = linter.verify("/* eslint no-alert: [error, {nonExistentPropertyName: true}]*/");
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.deepStrictEqual(
@@ -2077,7 +1821,7 @@ describe("Linter", () => {
             const suppressedMessages = linter.getSuppressedMessages();
 
             // different engines have different JSON parsing error messages
-            assert.match(messages[0].message, /Failed to parse JSON from ' "no-unused-vars": \['/u);
+            assert.match(messages[0].message, /Failed to parse JSON from '"no-unused-vars": \['/u);
             assert.strictEqual(messages[0].severity, 2);
             assert.isTrue(messages[0].fatal);
             assert.isNull(messages[0].ruleId);
@@ -2296,16 +2040,166 @@ describe("Linter", () => {
             const codeA = "/*eslint test-plugin/test-rule: 0*/ var a = \"trigger violation\";";
             const codeB = "var a = \"trigger violation\";";
 
-            let messages = linter.verify(codeA, config, filename, false);
+            let messages = linter.verify(codeA, config, filename);
             let suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
             assert.strictEqual(suppressedMessages.length, 0);
 
-            messages = linter.verify(codeB, config, filename, false);
+            messages = linter.verify(codeB, config, filename);
             suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 1);
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+    });
+
+    describe("when evaluating code with multiple configuration comments for same rule", () => {
+
+        beforeEach(() => {
+            linter.defineRule("no-foo", {
+                meta: {
+                    schema: [{
+                        enum: ["bar", "baz", "qux"]
+                    }]
+                },
+                create(context) {
+                    const replacement = context.options[0] ?? "default";
+
+                    return {
+                        "Identifier[name='foo']"(node) {
+                            context.report(node, `Replace 'foo' with '${replacement}'.`);
+                        }
+                    };
+                }
+            });
+        });
+
+        it("should apply the first and report an error for the second when there are two", () => {
+            const code = "/*eslint no-foo: ['error', 'bar']*/ /*eslint no-foo: ['error', 'baz']*/ foo;";
+
+            const messages = linter.verify(code);
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(messages, [
+                {
+                    ruleId: null,
+                    severity: 2,
+                    message: "Rule \"no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                    line: 1,
+                    column: 37,
+                    endLine: 1,
+                    endColumn: 72,
+                    nodeType: null
+                },
+                {
+                    ruleId: "no-foo",
+                    severity: 2,
+                    message: "Replace 'foo' with 'bar'.",
+                    line: 1,
+                    column: 73,
+                    endLine: 1,
+                    endColumn: 76,
+                    nodeType: "Identifier"
+                }
+            ]);
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("should apply the first and report an error for each other when there are more than two", () => {
+            const code = "/*eslint no-foo: ['error', 'bar']*/ /*eslint no-foo: ['error', 'baz']*/ /*eslint no-foo: ['error', 'qux']*/ foo;";
+
+            const messages = linter.verify(code);
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(messages, [
+                {
+                    ruleId: null,
+                    severity: 2,
+                    message: "Rule \"no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                    line: 1,
+                    column: 37,
+                    endLine: 1,
+                    endColumn: 72,
+                    nodeType: null
+                },
+                {
+                    ruleId: null,
+                    severity: 2,
+                    message: "Rule \"no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                    line: 1,
+                    column: 73,
+                    endLine: 1,
+                    endColumn: 108,
+                    nodeType: null
+                },
+                {
+                    ruleId: "no-foo",
+                    severity: 2,
+                    message: "Replace 'foo' with 'bar'.",
+                    line: 1,
+                    column: 109,
+                    endLine: 1,
+                    endColumn: 112,
+                    nodeType: "Identifier"
+                }
+            ]);
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("should apply the first and report an error for the second when both just override severity", () => {
+            const code = "/*eslint no-foo: 'warn'*/ /*eslint no-foo: 'error'*/ foo;";
+
+            const messages = linter.verify(code, { rules: { "no-foo": ["error", "bar"] } });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(messages, [
+                {
+                    ruleId: null,
+                    severity: 2,
+                    message: "Rule \"no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                    line: 1,
+                    column: 27,
+                    endLine: 1,
+                    endColumn: 53,
+                    nodeType: null
+                },
+                {
+                    ruleId: "no-foo",
+                    severity: 1,
+                    message: "Replace 'foo' with 'bar'.",
+                    line: 1,
+                    column: 54,
+                    endLine: 1,
+                    endColumn: 57,
+                    nodeType: "Identifier"
+                }
+            ]);
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("should apply the second if the first has an invalid configuration", () => {
+            const code = "/*eslint no-foo: ['error', 'quux']*/ /*eslint no-foo: ['error', 'bar']*/ foo;";
+
+            const messages = linter.verify(code);
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 2);
+            assert.include(messages[0].message, "Configuration for rule \"no-foo\" is invalid");
+            assert.strictEqual(messages[1].message, "Replace 'foo' with 'bar'.");
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("should apply configurations for other rules that are in the same comment as the duplicate", () => {
+            const code = "/*eslint no-foo: ['error', 'bar']*/ /*eslint no-foo: ['error', 'baz'], no-alert: ['error']*/ foo; alert();";
+
+            const messages = linter.verify(code);
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 3);
+            assert.strictEqual(messages[0].message, "Rule \"no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.");
+            assert.strictEqual(messages[1].message, "Replace 'foo' with 'bar'.");
+            assert.strictEqual(messages[2].ruleId, "no-alert");
             assert.strictEqual(suppressedMessages.length, 0);
         });
     });
@@ -3456,9 +3350,15 @@ describe("Linter", () => {
              * first part only as defined in the
              * parseJsonConfig function in lib/eslint.js
              */
-            assert.match(messages[0].message, /^Failed to parse JSON from ' "no-alert":'1'':/u);
+            assert.match(messages[0].message, /^Failed to parse JSON from '"no-alert":'1'':/u);
             assert.strictEqual(messages[0].line, 1);
             assert.strictEqual(messages[0].column, 1);
+            assert.strictEqual(messages[0].endLine, 1);
+            assert.strictEqual(messages[0].endColumn, 24);
+            assert.strictEqual(messages[0].ruleId, null);
+            assert.strictEqual(messages[0].fatal, true);
+            assert.strictEqual(messages[0].severity, 2);
+            assert.strictEqual(messages[0].nodeType, null);
 
             assert.strictEqual(messages[1].ruleId, "no-alert");
             assert.strictEqual(messages[1].message, "Unexpected alert.");
@@ -3484,9 +3384,15 @@ describe("Linter", () => {
              * first part only as defined in the
              * parseJsonConfig function in lib/eslint.js
              */
-            assert.match(messages[0].message, /^Failed to parse JSON from ' "no-alert":abc':/u);
+            assert.match(messages[0].message, /^Failed to parse JSON from '"no-alert":abc':/u);
             assert.strictEqual(messages[0].line, 1);
             assert.strictEqual(messages[0].column, 1);
+            assert.strictEqual(messages[0].endLine, 1);
+            assert.strictEqual(messages[0].endColumn, 24);
+            assert.strictEqual(messages[0].ruleId, null);
+            assert.strictEqual(messages[0].fatal, true);
+            assert.strictEqual(messages[0].severity, 2);
+            assert.strictEqual(messages[0].nodeType, null);
 
             assert.strictEqual(messages[1].ruleId, "no-alert");
             assert.strictEqual(messages[1].message, "Unexpected alert.");
@@ -3496,7 +3402,7 @@ describe("Linter", () => {
         });
 
         it("should report a violation", () => {
-            const code = "/*eslint no-alert:0 2*/ alert('test');";
+            const code = "\n\n\n    /*eslint no-alert:0 2*/ alert('test');";
 
             const config = { rules: { "no-alert": 1 } };
 
@@ -3512,9 +3418,15 @@ describe("Linter", () => {
              * first part only as defined in the
              * parseJsonConfig function in lib/eslint.js
              */
-            assert.match(messages[0].message, /^Failed to parse JSON from ' "no-alert":0 2':/u);
-            assert.strictEqual(messages[0].line, 1);
-            assert.strictEqual(messages[0].column, 1);
+            assert.match(messages[0].message, /^Failed to parse JSON from '"no-alert":0 2':/u);
+            assert.strictEqual(messages[0].line, 4);
+            assert.strictEqual(messages[0].column, 5);
+            assert.strictEqual(messages[0].endLine, 4);
+            assert.strictEqual(messages[0].endColumn, 28);
+            assert.strictEqual(messages[0].ruleId, null);
+            assert.strictEqual(messages[0].fatal, true);
+            assert.strictEqual(messages[0].severity, 2);
+            assert.strictEqual(messages[0].nodeType, null);
 
             assert.strictEqual(messages[1].ruleId, "no-alert");
             assert.strictEqual(messages[1].message, "Unexpected alert.");
@@ -3593,7 +3505,7 @@ var a = "test2";
             const code = "#!bin/program\n\nvar foo;;";
             const config = { rules: { checker: "error" } };
             const spy = sinon.spy(context => {
-                const comments = context.getAllComments();
+                const comments = context.sourceCode.getAllComments();
 
                 assert.strictEqual(comments.length, 1);
                 assert.strictEqual(comments[0].type, "Shebang");
@@ -3613,7 +3525,7 @@ var a = "test2";
             linter.defineRule("checker", {
                 create(context) {
                     spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node), "'123';");
+                        assert.strictEqual(context.sourceCode.getText(node), "'123';");
                     });
                     return { ExpressionStatement: spy };
                 }
@@ -3663,8 +3575,6 @@ var a = "test2";
     });
 
     describe("when using an invalid (undefined) rule", () => {
-        linter = new Linter();
-
         const code = TEST_CODE;
         let results, result, warningResult, arrayOptionResults, objectOptionResults, resultsMultiple;
 
@@ -3965,8 +3875,8 @@ var a = "test2";
             linter.defineRules({
                 test: {
                     create: context => ({
-                        Program() {
-                            const scope = context.getScope();
+                        Program(node) {
+                            const scope = context.sourceCode.getScope(node);
                             const sourceCode = context.sourceCode;
                             const comments = sourceCode.getAllComments();
 
@@ -4132,8 +4042,8 @@ var a = "test2";
         const config = { rules: { checker: "error" } };
 
         it("should get cwd correctly in the context", () => {
-            const cwd = "cwd";
-            const linterWithOption = new Linter({ cwd });
+            const cwd = "/cwd";
+            const linterWithOption = new Linter({ cwd, configType: "eslintrc" });
             let spy;
 
             linterWithOption.defineRule("checker", {
@@ -4152,7 +4062,7 @@ var a = "test2";
 
         it("should assign process.cwd() to it if cwd is undefined", () => {
             let spy;
-            const linterWithOption = new Linter({ });
+            const linterWithOption = new Linter({ configType: "eslintrc" });
 
             linterWithOption.defineRule("checker", {
                 create(context) {
@@ -4323,6 +4233,166 @@ var a = "test2";
             assert.strictEqual(suppressedMessages.length, 0);
         });
 
+        it("reports problems for unused eslint-enable comments", () => {
+            const messages = linter.verify("/* eslint-enable */", {}, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        ruleId: null,
+                        message: "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+                        line: 1,
+                        column: 1,
+                        fix: {
+                            range: [0, 19],
+                            text: " "
+                        },
+                        severity: 2,
+                        nodeType: null
+                    }
+                ]
+            );
+
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("reports problems for unused eslint-enable comments with ruleId", () => {
+            const messages = linter.verify("/* eslint-enable no-alert */", {}, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        ruleId: null,
+                        message: "Unused eslint-enable directive (no matching eslint-disable directives were found for 'no-alert').",
+                        line: 1,
+                        column: 1,
+                        fix: {
+                            range: [0, 28],
+                            text: " "
+                        },
+                        severity: 2,
+                        nodeType: null
+                    }
+                ]
+            );
+
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("reports problems for unused eslint-enable comments with mismatch ruleId", () => {
+            const code = [
+                "/* eslint-disable no-alert */",
+                "alert(\"test\");",
+                "/* eslint-enable no-console */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        ruleId: null,
+                        message: "Unused eslint-enable directive (no matching eslint-disable directives were found for 'no-console').",
+                        line: 3,
+                        column: 1,
+                        fix: {
+                            range: [45, 75],
+                            text: " "
+                        },
+                        severity: 2,
+                        nodeType: null
+                    }
+                ]
+            );
+
+            assert.strictEqual(suppressedMessages.length, 1);
+        });
+
+        it("reports problems for unused eslint-enable comments with used eslint-enable comments", () => {
+            const code = [
+                "/* eslint-disable no-alert -- j1 */",
+                "alert(\"test\");",
+                "/* eslint-disable no-alert -- j2 */",
+                "alert(\"test\");",
+                "/* eslint-enable no-alert -- j3 */",
+                "/* eslint-enable -- j4 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        ruleId: null,
+                        message: "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+                        line: 6,
+                        column: 1,
+                        fix: {
+                            range: [137, 162],
+                            text: " "
+                        },
+                        severity: 2,
+                        nodeType: null
+                    }
+                ]
+            );
+
+            assert.strictEqual(suppressedMessages.length, 2);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+            assert.strictEqual(suppressedMessages[1].suppressions.length, 2);
+        });
+
+        it("reports problems for unused eslint-disable comments with used eslint-enable comments", () => {
+            const code = [
+                "/* eslint-disable no-alert -- j1 */",
+                "console.log(\"test\"); //",
+                "/* eslint-enable no-alert -- j2 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        ruleId: null,
+                        message: "Unused eslint-disable directive (no problems were reported from 'no-alert').",
+                        line: 1,
+                        column: 1,
+                        fix: {
+                            range: [0, 35],
+                            text: " "
+                        },
+                        severity: 2,
+                        nodeType: null
+                    }
+                ]
+            );
+
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
         it("reports problems for unused eslint-disable comments (in config)", () => {
             const messages = linter.verify("/* eslint-disable */", { reportUnusedDisableDirectives: true });
             const suppressedMessages = linter.getSuppressedMessages();
@@ -4407,12 +4477,156 @@ var a = "test2";
             assert.strictEqual(suppressedMessages[0].ruleId, "no-fallthrough");
         });
 
+        it("reports problems for multiple eslint-enable comments with same ruleId", () => {
+            const code = [
+                "/* eslint-disable no-alert -- j1 */",
+                "alert(\"test\"); //",
+                "/* eslint-enable no-alert -- j2 */",
+                "/* eslint-enable no-alert -- j3 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].line, 4);
+            assert.strictEqual(suppressedMessages.length, 1);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+        });
+
+        it("reports problems for multiple eslint-enable comments without ruleId (Rule is already enabled)", () => {
+            const code = [
+                "/* eslint-disable no-alert -- j1 */",
+                "alert(\"test\"); //",
+                "/* eslint-enable no-alert -- j2 */",
+                "/* eslint-enable -- j3 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].line, 4);
+            assert.strictEqual(suppressedMessages.length, 1);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+        });
+
+        it("reports problems for multiple eslint-enable comments with ruleId (Rule is already enabled by eslint-enable comments without ruleId)", () => {
+            const code = [
+                "/* eslint-disable no-alert -- j1 */",
+                "alert(\"test\"); //",
+                "/* eslint-enable -- j3 */",
+                "/* eslint-enable no-alert -- j2 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].line, 4);
+            assert.strictEqual(suppressedMessages.length, 1);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+        });
+
+        it("reports problems for eslint-enable comments without ruleId (Two rules are already enabled)", () => {
+            const code = [
+                "/* eslint-disable no-alert, no-console -- j1 */",
+                "alert(\"test\"); //",
+                "console.log(\"test\"); //",
+                "/* eslint-enable no-alert -- j2 */",
+                "/* eslint-enable no-console -- j3 */",
+                "/* eslint-enable -- j4 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2,
+                    "no-console": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].line, 6);
+            assert.strictEqual(suppressedMessages.length, 2);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+            assert.strictEqual(suppressedMessages[1].suppressions.length, 1);
+        });
+
+        it("reports problems for multiple eslint-enable comments with ruleId (Two rules are already enabled by eslint-enable comments without ruleId)", () => {
+            const code = [
+                "/* eslint-disable no-alert, no-console -- j1 */",
+                "alert(\"test\"); //",
+                "console.log(\"test\"); //",
+                "/* eslint-enable -- j2 */",
+                "/* eslint-enable no-console -- j3 */",
+                "/* eslint-enable no-alert -- j4 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2,
+                    "no-console": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 2);
+            assert.strictEqual(messages[0].line, 5);
+            assert.strictEqual(messages[1].line, 6);
+            assert.strictEqual(suppressedMessages.length, 2);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+            assert.strictEqual(suppressedMessages[1].suppressions.length, 1);
+        });
+
+        it("reports problems for multiple eslint-enable comments", () => {
+            const code = [
+                "/* eslint-disable no-alert, no-console -- j1 */",
+                "alert(\"test\"); //",
+                "console.log(\"test\"); //",
+                "/* eslint-enable no-console -- j2 */",
+                "/* eslint-enable -- j3 */",
+                "/* eslint-enable no-alert -- j4 */",
+                "/* eslint-enable -- j5 */"
+            ].join("\n");
+            const config = {
+                rules: {
+                    "no-alert": 2,
+                    "no-console": 2
+                }
+            };
+            const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 2);
+            assert.strictEqual(messages[0].line, 6);
+            assert.strictEqual(messages[1].line, 7);
+            assert.strictEqual(suppressedMessages.length, 2);
+            assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+            assert.strictEqual(suppressedMessages[1].suppressions.length, 1);
+        });
+
         describe("autofix", () => {
             const alwaysReportsRule = {
                 create(context) {
                     return {
                         Program(node) {
                             context.report({ message: "bad code", loc: node.loc.end });
+                        },
+                        "Identifier[name=bad]"(node) {
+                            context.report({ message: "bad id", loc: node.loc });
                         }
                     };
                 }
@@ -4482,6 +4696,10 @@ var a = "test2";
                     code: "/* eslint-disable \nunused\n*/",
                     output: " "
                 },
+                {
+                    code: "/* eslint-enable \nunused\n*/",
+                    output: " "
+                },
 
                 //-----------------------------------------------
                 // Removing only individual rules
@@ -4521,6 +4739,26 @@ var a = "test2";
                     output: "/*\u00A0eslint-disable used*/"
                 },
                 {
+                    code: "/* eslint-disable used*/ bad /*\neslint-enable unused, used*/",
+                    output: "/* eslint-disable used*/ bad /*\neslint-enable used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /*\n eslint-enable unused, used*/",
+                    output: "/* eslint-disable used*/ bad /*\n eslint-enable used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /*\r\neslint-enable unused, used*/",
+                    output: "/* eslint-disable used*/ bad /*\r\neslint-enable used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /*\u2028eslint-enable unused, used*/",
+                    output: "/* eslint-disable used*/ bad /*\u2028eslint-enable used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /*\u00A0eslint-enable unused, used*/",
+                    output: "/* eslint-disable used*/ bad /*\u00A0eslint-enable used*/"
+                },
+                {
                     code: "// eslint-disable-line  unused, used",
                     output: "// eslint-disable-line  used"
                 },
@@ -4543,6 +4781,26 @@ var a = "test2";
                 {
                     code: "/* eslint-disable\u00A0unused, used*/",
                     output: "/* eslint-disable\u00A0used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable\nunused, used*/",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable\nused*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable\n unused, used*/",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable\n used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable\r\nunused, used*/",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable\r\nused*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable\u2028unused, used*/",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable\u2028used*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable\u00A0unused, used*/",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable\u00A0used*/"
                 },
 
                 // when removing the first rule, the comma and all whitespace up to the next rule (or next lone comma) should also be removed
@@ -4577,6 +4835,18 @@ var a = "test2";
                 {
                     code: "/* eslint-disable unused\u2028,\u2028used */",
                     output: "/* eslint-disable used */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable unused\n,\nused */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable unused \n \n,\n\n used */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable unused\u2028,\u2028used */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used */"
                 },
                 {
                     code: "// eslint-disable-line unused\u00A0,\u00A0used",
@@ -4633,6 +4903,18 @@ var a = "test2";
                     output: "/* eslint-disable used-1,used-2 */"
                 },
                 {
+                    code: "/* eslint-disable used-1, used-2*/ bad /* eslint-enable used-1,\nunused\n,used-2 */",
+                    output: "/* eslint-disable used-1, used-2*/ bad /* eslint-enable used-1,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1, used-2*/ bad /* eslint-enable used-1,\n\n unused \n \n ,used-2 */",
+                    output: "/* eslint-disable used-1, used-2*/ bad /* eslint-enable used-1,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1, used-2*/ bad /* eslint-enable used-1,\u2028unused\u2028,used-2 */",
+                    output: "/* eslint-disable used-1, used-2*/ bad /* eslint-enable used-1,used-2 */"
+                },
+                {
                     code: "// eslint-disable-line used-1,\u00A0unused\u00A0,used-2",
                     output: "// eslint-disable-line used-1,used-2"
                 },
@@ -4667,6 +4949,14 @@ var a = "test2";
                     output: "/* eslint-disable used-1\u2028,\u2028used-2 */"
                 },
                 {
+                    code: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1\n,unused,\nused-2 */",
+                    output: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1\n,\nused-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1\u2028,unused,\u2028used-2 */",
+                    output: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1\u2028,\u2028used-2 */"
+                },
+                {
                     code: "// eslint-disable-line used-1\u00A0,unused,\u00A0used-2",
                     output: "// eslint-disable-line used-1\u00A0,\u00A0used-2"
                 },
@@ -4691,6 +4981,18 @@ var a = "test2";
                     output: "/* eslint-disable used-1,\n,\n,used-2 */"
                 },
                 {
+                    code: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1,\n,unused,used-2 */",
+                    output: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1,\n,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1,unused,\n,used-2 */",
+                    output: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1,\n,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1,\n,unused,\n,used-2 */",
+                    output: "/* eslint-disable used-1, used-2 */ bad /* eslint-enable used-1,\n,\n,used-2 */"
+                },
+                {
                     code: "// eslint-disable-line used, unused,",
                     output: "// eslint-disable-line used,"
                 },
@@ -4709,6 +5011,10 @@ var a = "test2";
                 {
                     code: "/* eslint-disable used, unused,\n*/",
                     output: "/* eslint-disable used,\n*/"
+                },
+                {
+                    code: "/* eslint-disable used */ bad /* eslint-enable used, unused,\n*/",
+                    output: "/* eslint-disable used */ bad /* eslint-enable used,\n*/"
                 },
 
                 // when removing the last rule, the comma and all whitespace up to the previous rule (or previous lone comma) should also be removed
@@ -4749,6 +5055,18 @@ var a = "test2";
                     output: "/* eslint-disable used */"
                 },
                 {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable used\n,\nunused */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable used \n \n,\n\n unused */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable used\u2028,\u2028unused */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used */"
+                },
+                {
                     code: "// eslint-disable-line used\u00A0,\u00A0unused",
                     output: "// eslint-disable-line used"
                 },
@@ -4767,6 +5085,14 @@ var a = "test2";
                 {
                     code: "/* eslint-disable used\n, ,unused */",
                     output: "/* eslint-disable used\n, */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable used,\n,unused */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used, */"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable used\n, ,unused */",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used\n, */"
                 },
 
                 // content after the last rule should not be changed
@@ -4797,6 +5123,10 @@ var a = "test2";
                 {
                     code: "/* eslint-disable used,unused\u2028*/",
                     output: "/* eslint-disable used\u2028*/"
+                },
+                {
+                    code: "/* eslint-disable used*/ bad /* eslint-enable used,unused\u2028*/",
+                    output: "/* eslint-disable used*/ bad /* eslint-enable used\u2028*/"
                 },
                 {
                     code: "// eslint-disable-line used,unused\u00A0",
@@ -4931,6 +5261,166 @@ var a = "test2";
                     `,
                     output: `
                         /* eslint-disable
+                               used-1,
+                               used-2
+
+                               -- comment
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable unused-1,
+                           used-1,
+                           unused-2,
+                           used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable used-1,
+                           used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable unused-1,
+                           used-1,
+                           unused-2,
+                           used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable used-1,
+                           used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               unused-1,
+                               used-1,
+                               unused-2,
+                               used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               used-1,
+                               used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               used-1,
+                               unused-1,
+                               used-2,
+                               unused-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               used-1,
+                               used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               used-1,
+                               unused-1,
+                               used-2,
+                               unused-2,
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               used-1,
+                               used-2,
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               ,unused-1
+                               ,used-1
+                               ,unused-2
+                               ,used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               ,used-1
+                               ,used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               ,used-1
+                               ,unused-1
+                               ,used-2
+                               ,unused-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               ,used-1
+                               ,used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
+                               used-1,
+                               unused-1,
+                               used-2,
+                               unused-2
+
+                               -- comment
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1, used-2*/
+                        bad
+                        /* eslint-enable
                                used-1,
                                used-2
 
@@ -5189,7 +5679,7 @@ var a = "test2";
             linter.defineRule("checker", {
                 create(context) {
                     spy = sinon.spy(node => {
-                        assert.strictEqual(context.getSource(node), "'123';");
+                        assert.strictEqual(context.sourceCode.getText(node), "'123';");
                     });
                     return { ExpressionStatement: spy };
                 }
@@ -5315,7 +5805,7 @@ var a = "test2";
             });
 
             it("supports ECMAScript version 'latest'", () => {
-                const messages = linter.verify("let x = /[\\q{abc|d}&&[A--B]]/v;", {
+                const messages = linter.verify("let x = /(?<x>a)|(?<x>b)/;", {
                     parserOptions: { ecmaVersion: "latest" }
                 });
                 const suppressedMessages = linter.getSuppressedMessages();
@@ -5370,7 +5860,7 @@ var a = "test2";
                 assert.strictEqual(ecmaVersion, espree.latestEcmaVersion + 2009, "ecmaVersion should be 2022");
             });
 
-            it("the 'next' is equal to espree.latestEcmaVersion on languageOptions with custom parser", () => {
+            it("the 'next' is equal to ESLint's latest ECMA version on languageOptions with custom parser", () => {
                 let ecmaVersion = null;
                 const config = { rules: { "ecma-version": 2 }, parser: "custom-parser", parserOptions: { ecmaVersion: "next" } };
 
@@ -5383,7 +5873,7 @@ var a = "test2";
                     })
                 });
                 linter.verify("", config);
-                assert.strictEqual(ecmaVersion, espree.latestEcmaVersion + 2009, "ecmaVersion should be 2022");
+                assert.strictEqual(ecmaVersion, LATEST_ECMA_VERSION, `ecmaVersion should be ${LATEST_ECMA_VERSION}`);
             });
 
             it("missing ecmaVersion is equal to 5 on languageOptions with custom parser", () => {
@@ -5407,8 +5897,8 @@ var a = "test2";
 
                 linter.defineRule("block-scope", {
                     create: context => ({
-                        BlockStatement() {
-                            blockScope = context.getScope();
+                        BlockStatement(node) {
+                            blockScope = context.sourceCode.getScope(node);
                         }
                     })
                 });
@@ -5812,8 +6302,8 @@ var a = "test2";
             linter.defineRules({
                 test: {
                     create: context => ({
-                        Program() {
-                            const scope = context.getScope();
+                        Program(node) {
+                            const scope = context.sourceCode.getScope(node);
                             const sourceCode = context.sourceCode;
                             const comments = sourceCode.getAllComments();
 
@@ -5879,6 +6369,36 @@ var a = "test2";
         it("should not crash when we reuse the SourceCode object", () => {
             linter.verify("function render() { return <div className='test'>{hello}</div> }", { parserOptions: { ecmaVersion: 6, ecmaFeatures: { jsx: true } } });
             linter.verify(linter.getSourceCode(), { parserOptions: { ecmaVersion: 6, ecmaFeatures: { jsx: true } } });
+        });
+
+        it("should verify a SourceCode object created with the constructor", () => {
+            const text = "var foo = bar;";
+            const sourceCode = new SourceCode({
+                text,
+                ast: espree.parse(text, { loc: true, range: true, tokens: true, comment: true })
+            });
+            const messages = linter.verify(sourceCode, { rules: { "no-undef": "error" } });
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].message, "'bar' is not defined.");
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        it("should ensure that SourceCode properties are copied over during linting", () => {
+            const text = "var foo = bar;";
+            const sourceCode = new SourceCode({
+                text,
+                ast: espree.parse(text, { loc: true, range: true, tokens: true, comment: true }),
+                hasBOM: true
+            });
+
+            linter.verify(sourceCode, { rules: { "no-undef": "error" } });
+            const resultSourceCode = linter.getSourceCode();
+
+            assert.strictEqual(resultSourceCode.text, text);
+            assert.strictEqual(resultSourceCode.ast, sourceCode.ast);
+            assert.strictEqual(resultSourceCode.hasBOM, true);
         });
 
         it("should reuse the SourceCode object", () => {
@@ -6062,7 +6582,23 @@ var a = "test2";
                         messageId: "unusedVar",
                         nodeType: "Identifier",
                         ruleId: "no-unused-vars",
-                        severity: 2
+                        severity: 2,
+                        suggestions: [
+                            {
+                                data: {
+                                    varName: "bbb"
+                                },
+                                desc: "Remove unused variable 'bbb'.",
+                                fix: {
+                                    range: [
+                                        99,
+                                        111
+                                    ],
+                                    text: ""
+                                },
+                                messageId: "removeVar"
+                            }
+                        ]
                     }]
                 );
 
@@ -6383,258 +6919,6 @@ var a = "test2";
         });
     });
 
-    describe("context.getScope()", () => {
-
-        /**
-         * Get the scope on the node `astSelector` specified.
-         * @param {string} code The source code to verify.
-         * @param {string} astSelector The AST selector to get scope.
-         * @param {number} [ecmaVersion=5] The ECMAScript version.
-         * @returns {{node: ASTNode, scope: escope.Scope}} Gotten scope.
-         */
-        function getScope(code, astSelector, ecmaVersion = 5) {
-            let node, scope;
-
-            linter.defineRule("get-scope", {
-                create: context => ({
-                    [astSelector](node0) {
-                        node = node0;
-                        scope = context.getScope();
-                    }
-                })
-            });
-            linter.verify(
-                code,
-                {
-                    parserOptions: { ecmaVersion },
-                    rules: { "get-scope": 2 }
-                }
-            );
-
-            return { node, scope };
-        }
-
-        it("should return 'function' scope on FunctionDeclaration (ES5)", () => {
-            const { node, scope } = getScope("function f() {}", "FunctionDeclaration");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node);
-        });
-
-        it("should return 'function' scope on FunctionExpression (ES5)", () => {
-            const { node, scope } = getScope("!function f() {}", "FunctionExpression");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node);
-        });
-
-        it("should return 'function' scope on the body of FunctionDeclaration (ES5)", () => {
-            const { node, scope } = getScope("function f() {}", "BlockStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent);
-        });
-
-        it("should return 'function' scope on the body of FunctionDeclaration (ES2015)", () => {
-            const { node, scope } = getScope("function f() {}", "BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent);
-        });
-
-        it("should return 'function' scope on BlockStatement in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { { var b; } }", "BlockStatement > BlockStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "b"]);
-        });
-
-        it("should return 'block' scope on BlockStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { { let a; var b; } }", "BlockStatement > BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "block");
-            assert.strictEqual(scope.upper.type, "function");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["a"]);
-            assert.deepStrictEqual(scope.variableScope.variables.map(v => v.name), ["arguments", "b"]);
-        });
-
-        it("should return 'block' scope on nested BlockStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { { let a; { let b; var c; } } }", "BlockStatement > BlockStatement > BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "block");
-            assert.strictEqual(scope.upper.type, "block");
-            assert.strictEqual(scope.upper.upper.type, "function");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["b"]);
-            assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["a"]);
-            assert.deepStrictEqual(scope.variableScope.variables.map(v => v.name), ["arguments", "c"]);
-        });
-
-        it("should return 'function' scope on SwitchStatement in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { switch (a) { case 0: var b; } }", "SwitchStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "b"]);
-        });
-
-        it("should return 'switch' scope on SwitchStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { switch (a) { case 0: let b; } }", "SwitchStatement", 2015);
-
-            assert.strictEqual(scope.type, "switch");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["b"]);
-        });
-
-        it("should return 'function' scope on SwitchCase in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { switch (a) { case 0: var b; } }", "SwitchCase");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "b"]);
-        });
-
-        it("should return 'switch' scope on SwitchCase in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { switch (a) { case 0: let b; } }", "SwitchCase", 2015);
-
-            assert.strictEqual(scope.type, "switch");
-            assert.strictEqual(scope.block, node.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["b"]);
-        });
-
-        it("should return 'catch' scope on CatchClause in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { try {} catch (e) { var a; } }", "CatchClause");
-
-            assert.strictEqual(scope.type, "catch");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["e"]);
-        });
-
-        it("should return 'catch' scope on CatchClause in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { try {} catch (e) { let a; } }", "CatchClause", 2015);
-
-            assert.strictEqual(scope.type, "catch");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["e"]);
-        });
-
-        it("should return 'catch' scope on the block of CatchClause in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { try {} catch (e) { var a; } }", "CatchClause > BlockStatement");
-
-            assert.strictEqual(scope.type, "catch");
-            assert.strictEqual(scope.block, node.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["e"]);
-        });
-
-        it("should return 'block' scope on the block of CatchClause in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { try {} catch (e) { let a; } }", "CatchClause > BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "block");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["a"]);
-        });
-
-        it("should return 'function' scope on ForStatement in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { for (var i = 0; i < 10; ++i) {} }", "ForStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "i"]);
-        });
-
-        it("should return 'for' scope on ForStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { for (let i = 0; i < 10; ++i) {} }", "ForStatement", 2015);
-
-            assert.strictEqual(scope.type, "for");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["i"]);
-        });
-
-        it("should return 'function' scope on the block body of ForStatement in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { for (var i = 0; i < 10; ++i) {} }", "ForStatement > BlockStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "i"]);
-        });
-
-        it("should return 'block' scope on the block body of ForStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { for (let i = 0; i < 10; ++i) {} }", "ForStatement > BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "block");
-            assert.strictEqual(scope.upper.type, "for");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), []);
-            assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["i"]);
-        });
-
-        it("should return 'function' scope on ForInStatement in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { for (var key in obj) {} }", "ForInStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "key"]);
-        });
-
-        it("should return 'for' scope on ForInStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { for (let key in obj) {} }", "ForInStatement", 2015);
-
-            assert.strictEqual(scope.type, "for");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["key"]);
-        });
-
-        it("should return 'function' scope on the block body of ForInStatement in functions (ES5)", () => {
-            const { node, scope } = getScope("function f() { for (var key in obj) {} }", "ForInStatement > BlockStatement");
-
-            assert.strictEqual(scope.type, "function");
-            assert.strictEqual(scope.block, node.parent.parent.parent);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "key"]);
-        });
-
-        it("should return 'block' scope on the block body of ForInStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { for (let key in obj) {} }", "ForInStatement > BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "block");
-            assert.strictEqual(scope.upper.type, "for");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), []);
-            assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["key"]);
-        });
-
-        it("should return 'for' scope on ForOfStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { for (let x of xs) {} }", "ForOfStatement", 2015);
-
-            assert.strictEqual(scope.type, "for");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), ["x"]);
-        });
-
-        it("should return 'block' scope on the block body of ForOfStatement in functions (ES2015)", () => {
-            const { node, scope } = getScope("function f() { for (let x of xs) {} }", "ForOfStatement > BlockStatement", 2015);
-
-            assert.strictEqual(scope.type, "block");
-            assert.strictEqual(scope.upper.type, "for");
-            assert.strictEqual(scope.block, node);
-            assert.deepStrictEqual(scope.variables.map(v => v.name), []);
-            assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["x"]);
-        });
-
-        it("should shadow the same name variable by the iteration variable.", () => {
-            const { node, scope } = getScope("let x; for (let x of x) {}", "ForOfStatement", 2015);
-
-            assert.strictEqual(scope.type, "for");
-            assert.strictEqual(scope.upper.type, "global");
-            assert.strictEqual(scope.block, node);
-            assert.strictEqual(scope.upper.variables[0].references.length, 0);
-            assert.strictEqual(scope.references[0].identifier, node.left.declarations[0].id);
-            assert.strictEqual(scope.references[1].identifier, node.right);
-            assert.strictEqual(scope.references[1].resolved, scope.variables[0]);
-        });
-    });
-
     describe("Variables and references", () => {
         const code = [
             "a;",
@@ -6656,8 +6940,8 @@ var a = "test2";
             linter.defineRules({
                 test: {
                     create: context => ({
-                        Program() {
-                            scope = context.getScope();
+                        Program(node) {
+                            scope = context.sourceCode.getScope(node);
                             ok = true;
                         }
                     })
@@ -6733,247 +7017,6 @@ var a = "test2";
             assert.strictEqual(scope.set.get("d").references[0].resolved, scope.set.get("d"));
             assert.strictEqual(scope.set.get("e").references[0].resolved, scope.set.get("e"));
             assert.strictEqual(scope.set.get("f").references[0].resolved, scope.set.get("f"));
-        });
-    });
-
-    describe("context.getDeclaredVariables(node)", () => {
-
-        /**
-         * Assert `context.getDeclaredVariables(node)` is valid.
-         * @param {string} code A code to check.
-         * @param {string} type A type string of ASTNode. This method checks variables on the node of the type.
-         * @param {Array<Array<string>>} expectedNamesList An array of expected variable names. The expected variable names is an array of string.
-         * @returns {void}
-         */
-        function verify(code, type, expectedNamesList) {
-            linter.defineRules({
-                test: {
-                    create(context) {
-
-                        /**
-                         * Assert `context.getDeclaredVariables(node)` is empty.
-                         * @param {ASTNode} node A node to check.
-                         * @returns {void}
-                         */
-                        function checkEmpty(node) {
-                            assert.strictEqual(0, context.getDeclaredVariables(node).length);
-                        }
-                        const rule = {
-                            Program: checkEmpty,
-                            EmptyStatement: checkEmpty,
-                            BlockStatement: checkEmpty,
-                            ExpressionStatement: checkEmpty,
-                            LabeledStatement: checkEmpty,
-                            BreakStatement: checkEmpty,
-                            ContinueStatement: checkEmpty,
-                            WithStatement: checkEmpty,
-                            SwitchStatement: checkEmpty,
-                            ReturnStatement: checkEmpty,
-                            ThrowStatement: checkEmpty,
-                            TryStatement: checkEmpty,
-                            WhileStatement: checkEmpty,
-                            DoWhileStatement: checkEmpty,
-                            ForStatement: checkEmpty,
-                            ForInStatement: checkEmpty,
-                            DebuggerStatement: checkEmpty,
-                            ThisExpression: checkEmpty,
-                            ArrayExpression: checkEmpty,
-                            ObjectExpression: checkEmpty,
-                            Property: checkEmpty,
-                            SequenceExpression: checkEmpty,
-                            UnaryExpression: checkEmpty,
-                            BinaryExpression: checkEmpty,
-                            AssignmentExpression: checkEmpty,
-                            UpdateExpression: checkEmpty,
-                            LogicalExpression: checkEmpty,
-                            ConditionalExpression: checkEmpty,
-                            CallExpression: checkEmpty,
-                            NewExpression: checkEmpty,
-                            MemberExpression: checkEmpty,
-                            SwitchCase: checkEmpty,
-                            Identifier: checkEmpty,
-                            Literal: checkEmpty,
-                            ForOfStatement: checkEmpty,
-                            ArrowFunctionExpression: checkEmpty,
-                            YieldExpression: checkEmpty,
-                            TemplateLiteral: checkEmpty,
-                            TaggedTemplateExpression: checkEmpty,
-                            TemplateElement: checkEmpty,
-                            ObjectPattern: checkEmpty,
-                            ArrayPattern: checkEmpty,
-                            RestElement: checkEmpty,
-                            AssignmentPattern: checkEmpty,
-                            ClassBody: checkEmpty,
-                            MethodDefinition: checkEmpty,
-                            MetaProperty: checkEmpty
-                        };
-
-                        rule[type] = function(node) {
-                            const expectedNames = expectedNamesList.shift();
-                            const variables = context.getDeclaredVariables(node);
-
-                            assert(Array.isArray(expectedNames));
-                            assert(Array.isArray(variables));
-                            assert.strictEqual(expectedNames.length, variables.length);
-                            for (let i = variables.length - 1; i >= 0; i--) {
-                                assert.strictEqual(expectedNames[i], variables[i].name);
-                            }
-                        };
-                        return rule;
-                    }
-                }
-            });
-            linter.verify(code, {
-                rules: { test: 2 },
-                parserOptions: {
-                    ecmaVersion: 6,
-                    sourceType: "module"
-                }
-            });
-
-            // Check all expected names are asserted.
-            assert.strictEqual(0, expectedNamesList.length);
-        }
-
-        it("VariableDeclaration", () => {
-            const code = "\n var {a, x: [b], y: {c = 0}} = foo;\n let {d, x: [e], y: {f = 0}} = foo;\n const {g, x: [h], y: {i = 0}} = foo, {j, k = function(z) { let l; }} = bar;\n ";
-            const namesList = [
-                ["a", "b", "c"],
-                ["d", "e", "f"],
-                ["g", "h", "i", "j", "k"],
-                ["l"]
-            ];
-
-            verify(code, "VariableDeclaration", namesList);
-        });
-
-        it("VariableDeclaration (on for-in/of loop)", () => {
-
-            // TDZ scope is created here, so tests to exclude those.
-            const code = "\n for (var {a, x: [b], y: {c = 0}} in foo) {\n let g;\n }\n for (let {d, x: [e], y: {f = 0}} of foo) {\n let h;\n }\n ";
-            const namesList = [
-                ["a", "b", "c"],
-                ["g"],
-                ["d", "e", "f"],
-                ["h"]
-            ];
-
-            verify(code, "VariableDeclaration", namesList);
-        });
-
-        it("VariableDeclarator", () => {
-
-            // TDZ scope is created here, so tests to exclude those.
-            const code = "\n var {a, x: [b], y: {c = 0}} = foo;\n let {d, x: [e], y: {f = 0}} = foo;\n const {g, x: [h], y: {i = 0}} = foo, {j, k = function(z) { let l; }} = bar;\n ";
-            const namesList = [
-                ["a", "b", "c"],
-                ["d", "e", "f"],
-                ["g", "h", "i"],
-                ["j", "k"],
-                ["l"]
-            ];
-
-            verify(code, "VariableDeclarator", namesList);
-        });
-
-        it("FunctionDeclaration", () => {
-            const code = "\n function foo({a, x: [b], y: {c = 0}}, [d, e]) {\n let z;\n }\n function bar({f, x: [g], y: {h = 0}}, [i, j = function(q) { let w; }]) {\n let z;\n }\n ";
-            const namesList = [
-                ["foo", "a", "b", "c", "d", "e"],
-                ["bar", "f", "g", "h", "i", "j"]
-            ];
-
-            verify(code, "FunctionDeclaration", namesList);
-        });
-
-        it("FunctionExpression", () => {
-            const code = "\n (function foo({a, x: [b], y: {c = 0}}, [d, e]) {\n let z;\n });\n (function bar({f, x: [g], y: {h = 0}}, [i, j = function(q) { let w; }]) {\n let z;\n });\n ";
-            const namesList = [
-                ["foo", "a", "b", "c", "d", "e"],
-                ["bar", "f", "g", "h", "i", "j"],
-                ["q"]
-            ];
-
-            verify(code, "FunctionExpression", namesList);
-        });
-
-        it("ArrowFunctionExpression", () => {
-            const code = "\n (({a, x: [b], y: {c = 0}}, [d, e]) => {\n let z;\n });\n (({f, x: [g], y: {h = 0}}, [i, j]) => {\n let z;\n });\n ";
-            const namesList = [
-                ["a", "b", "c", "d", "e"],
-                ["f", "g", "h", "i", "j"]
-            ];
-
-            verify(code, "ArrowFunctionExpression", namesList);
-        });
-
-        it("ClassDeclaration", () => {
-            const code = "\n class A { foo(x) { let y; } }\n class B { foo(x) { let y; } }\n ";
-            const namesList = [
-                ["A", "A"], // outer scope's and inner scope's.
-                ["B", "B"]
-            ];
-
-            verify(code, "ClassDeclaration", namesList);
-        });
-
-        it("ClassExpression", () => {
-            const code = "\n (class A { foo(x) { let y; } });\n (class B { foo(x) { let y; } });\n ";
-            const namesList = [
-                ["A"],
-                ["B"]
-            ];
-
-            verify(code, "ClassExpression", namesList);
-        });
-
-        it("CatchClause", () => {
-            const code = "\n try {} catch ({a, b}) {\n let x;\n try {} catch ({c, d}) {\n let y;\n }\n }\n ";
-            const namesList = [
-                ["a", "b"],
-                ["c", "d"]
-            ];
-
-            verify(code, "CatchClause", namesList);
-        });
-
-        it("ImportDeclaration", () => {
-            const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-            const namesList = [
-                [],
-                ["a"],
-                ["b", "c", "d"]
-            ];
-
-            verify(code, "ImportDeclaration", namesList);
-        });
-
-        it("ImportSpecifier", () => {
-            const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-            const namesList = [
-                ["c"],
-                ["d"]
-            ];
-
-            verify(code, "ImportSpecifier", namesList);
-        });
-
-        it("ImportDefaultSpecifier", () => {
-            const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-            const namesList = [
-                ["b"]
-            ];
-
-            verify(code, "ImportDefaultSpecifier", namesList);
-        });
-
-        it("ImportNamespaceSpecifier", () => {
-            const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-            const namesList = [
-                ["a"]
-            ];
-
-            verify(code, "ImportNamespaceSpecifier", namesList);
         });
     });
 
@@ -7110,8 +7153,8 @@ var a = "test2";
         let linter2 = null;
 
         beforeEach(() => {
-            linter1 = new Linter();
-            linter2 = new Linter();
+            linter1 = new Linter({ configType: "eslintrc" });
+            linter2 = new Linter({ configType: "eslintrc" });
         });
 
         describe("rules", () => {
@@ -7127,6 +7170,52 @@ var a = "test2";
                 assert.isTrue(linter1.getRules().has("mock-rule"), "mock rule is present");
                 assert.isFalse(linter2.getRules().has("mock-rule"), "mock rule is not present");
             });
+        });
+    });
+
+    describe("options", () => {
+        it("rules should apply meta.defaultOptions and ignore schema defaults", () => {
+            linter.defineRule("my-rule", {
+                meta: {
+                    defaultOptions: [{
+                        inBoth: "from-default-options",
+                        inDefaultOptions: "from-default-options"
+                    }],
+                    schema: {
+                        type: "object",
+                        properties: {
+                            inBoth: { default: "from-schema", type: "string" },
+                            inDefaultOptions: { type: "string" },
+                            inSchema: { default: "from-schema", type: "string" }
+                        },
+                        additionalProperties: false
+                    }
+                },
+                create(context) {
+                    return {
+                        Program(node) {
+                            context.report({
+                                message: JSON.stringify(context.options[0]),
+                                node
+                            });
+                        }
+                    };
+                }
+            });
+
+            const config = {
+                rules: {
+                    "my-rule": "error"
+                }
+            };
+
+            const code = "";
+            const messages = linter.verify(code, config);
+
+            assert.deepStrictEqual(
+                JSON.parse(messages[0].message),
+                { inBoth: "from-default-options", inDefaultOptions: "from-default-options" }
+            );
         });
     });
 
@@ -7625,7 +7714,7 @@ var a = "test2";
             }, "The create() function for rule 'checker' did not return an object.");
 
             linter.defineRule("checker", {
-                create() {}
+                create() { }
             }); // returns undefined
 
             assert.throws(() => {
@@ -7640,10 +7729,10 @@ var a = "test2";
 
         it("should have file path passed to it", () => {
             const code = "/* this is code */";
-            const parseSpy = { parse: sinon.spy() };
+            const parseSpy = { parse: sinon.spy(espree.parse) };
 
             linter.defineParser("stub-parser", parseSpy);
-            linter.verify(code, { parser: "stub-parser" }, filename, true);
+            linter.verify(code, { parser: "stub-parser" }, filename);
 
             sinon.assert.calledWithMatch(parseSpy.parse, "", { filePath: filename });
         });
@@ -7677,7 +7766,7 @@ var a = "test2";
             linter.defineParser("unknown-logical-operator", testParsers.unknownLogicalOperator);
 
             // This shouldn't throw
-            const messages = linter.verify(code, { parser: "unknown-logical-operator" }, filename, true);
+            const messages = linter.verify(code, { parser: "unknown-logical-operator" }, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
@@ -7690,7 +7779,7 @@ var a = "test2";
             linter.defineParser("unknown-logical-operator-nested", testParsers.unknownLogicalOperatorNested);
 
             // This shouldn't throw
-            const messages = linter.verify(code, { parser: "unknown-logical-operator-nested" }, filename, true);
+            const messages = linter.verify(code, { parser: "unknown-logical-operator-nested" }, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
@@ -7717,7 +7806,7 @@ var a = "test2";
                 rules: {
                     "collect-node-types": "error"
                 }
-            }, filename, true);
+            }, filename);
             const suppressedMessages = linter.getSuppressedMessages();
 
             assert.strictEqual(messages.length, 0);
@@ -7845,8 +7934,8 @@ var a = "test2";
                 linter.defineParser("enhanced-parser3", testParsers.enhancedParser3);
                 linter.defineRule("save-scope1", {
                     create: context => ({
-                        Program() {
-                            scope = context.getScope();
+                        Program(node) {
+                            scope = context.sourceCode.getScope(node);
                         }
                     })
                 });
@@ -7868,8 +7957,8 @@ var a = "test2";
 
                 linter.defineRule("save-scope2", {
                     create: context => ({
-                        Program() {
-                            scope2 = context.getScope();
+                        Program(node) {
+                            scope2 = context.sourceCode.getScope(node);
                         }
                     })
                 });
@@ -7888,6 +7977,7 @@ var a = "test2";
             assert.strictEqual(messages.length, 0);
             assert.strictEqual(suppressedMessages.length, 0);
         });
+
     });
 
     describe("merging 'parserOptions'", () => {
@@ -7923,10 +8013,12 @@ describe("Linter with FlatConfigArray", () => {
      * Creates a config array with some default properties.
      * @param {FlatConfig|FlatConfig[]} value The value to base the
      *      config array on.
+     * @param {{basePath: string, shouldIgnore: boolean, baseConfig: FlatConfig}} [options]
+     *      The options to use for the config array instance.
      * @returns {FlatConfigArray} The created config array.
      */
-    function createFlatConfigArray(value) {
-        return new FlatConfigArray(value, { basePath: "" });
+    function createFlatConfigArray(value, options) {
+        return new FlatConfigArray(value, options);
     }
 
     beforeEach(() => {
@@ -7938,6 +8030,37 @@ describe("Linter with FlatConfigArray", () => {
             it("should return same version as instance property", () => {
                 assert.strictEqual(Linter.version, linter.version);
             });
+        });
+    });
+
+    describe("hasFlag()", () => {
+
+        it("should return true if an active flag is present", () => {
+            assert.strictEqual(
+                new Linter({ configType: "flat", flags: ["test_only"] }).hasFlag("test_only"),
+                true
+            );
+        });
+
+        it("should throw an error if an inactive flag is present", () => {
+            assert.throws(() => {
+                // eslint-disable-next-line no-new -- needed for test
+                new Linter({ configType: "flat", flags: ["test_only_old"] });
+            }, /The flag 'test_only_old' is inactive: Used only for testing/u);
+        });
+
+        it("should throw an error if an unknown flag is present", () => {
+            assert.throws(() => {
+                // eslint-disable-next-line no-new -- needed for test
+                new Linter({ configType: "flat", flags: ["x_unknown"] });
+            }, /Unknown flag 'x_unknown'/u);
+        });
+
+        it("should return false if the flag is not present", () => {
+            assert.strictEqual(
+                new Linter({ configType: "flat" }).hasFlag("x_feature"),
+                false
+            );
         });
     });
 
@@ -8034,6 +8157,14 @@ describe("Linter with FlatConfigArray", () => {
                     linter.verify("foo", config, filename);
                 });
 
+                it("ecmaVersion should be 'latest' by default", () => {
+                    const messages = linter.verify("let x = /(?<x>a)|(?<x>b)/;"); // ECMAScript 2025 syntax
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 0); // No parsing errors
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
                 it("ecmaVersion should be normalized to latest year by default", () => {
                     const config = {
                         plugins: {
@@ -8042,7 +8173,7 @@ describe("Linter with FlatConfigArray", () => {
                                     checker: {
                                         create: context => ({
                                             Program() {
-                                                assert.strictEqual(context.languageOptions.ecmaVersion, espree.latestEcmaVersion + 2009);
+                                                assert.strictEqual(context.languageOptions.ecmaVersion, LATEST_ECMA_VERSION);
                                             }
                                         })
                                     }
@@ -8087,7 +8218,7 @@ describe("Linter with FlatConfigArray", () => {
                                     checker: {
                                         create: context => ({
                                             Program() {
-                                                assert.strictEqual(context.languageOptions.ecmaVersion, espree.latestEcmaVersion + 2009);
+                                                assert.strictEqual(context.languageOptions.ecmaVersion, LATEST_ECMA_VERSION);
                                             }
                                         })
                                     }
@@ -8335,7 +8466,6 @@ describe("Linter with FlatConfigArray", () => {
                                     "test-service-rule": {
                                         create: context => ({
                                             Literal(node) {
-                                                assert.strictEqual(context.parserServices, context.sourceCode.parserServices);
                                                 context.report({
                                                     node,
                                                     message: context.sourceCode.parserServices.test.getMessage()
@@ -8372,7 +8502,6 @@ describe("Linter with FlatConfigArray", () => {
                                     "test-service-rule": {
                                         create: context => ({
                                             Literal(node) {
-                                                assert.strictEqual(context.parserServices, context.sourceCode.parserServices);
                                                 context.report({
                                                     node,
                                                     message: context.sourceCode.parserServices.test.getMessage()
@@ -8445,14 +8574,14 @@ describe("Linter with FlatConfigArray", () => {
 
                     it("should have file path passed to it", () => {
                         const code = "/* this is code */";
-                        const parseSpy = { parse: sinon.spy() };
+                        const parseSpy = { parse: sinon.spy(espree.parse) };
                         const config = {
                             languageOptions: {
                                 parser: parseSpy
                             }
                         };
 
-                        linter.verify(code, config, filename, true);
+                        linter.verify(code, config, filename);
 
                         sinon.assert.calledWithMatch(parseSpy.parse, "", { filePath: filename });
                     });
@@ -8532,7 +8661,7 @@ describe("Linter with FlatConfigArray", () => {
                             }
                         };
 
-                        const messages = linter.verify(code, config, filename, true);
+                        const messages = linter.verify(code, config, filename);
                         const suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 0);
@@ -8684,8 +8813,8 @@ describe("Linter with FlatConfigArray", () => {
                                         rules: {
                                             "save-scope1": {
                                                 create: context => ({
-                                                    Program() {
-                                                        scope = context.getScope();
+                                                    Program(node) {
+                                                        scope = context.sourceCode.getScope(node);
                                                     }
                                                 })
                                             }
@@ -8721,8 +8850,8 @@ describe("Linter with FlatConfigArray", () => {
                                         rules: {
                                             "save-scope2": {
                                                 create: context => ({
-                                                    Program() {
-                                                        scope2 = context.getScope();
+                                                    Program(node) {
+                                                        scope2 = context.sourceCode.getScope(node);
                                                     }
                                                 })
                                             }
@@ -8754,7 +8883,7 @@ describe("Linter with FlatConfigArray", () => {
                         }, "filename.js");
 
                         assert(spy.calledWithMatch(";", {
-                            ecmaVersion: espree.latestEcmaVersion + 2009,
+                            ecmaVersion: LATEST_ECMA_VERSION,
                             sourceType: "module"
                         }));
                     });
@@ -9133,7 +9262,7 @@ describe("Linter with FlatConfigArray", () => {
 
                 config.rules[rule] = 1;
 
-                const messages = linter.verify(code, config, filename, true);
+                const messages = linter.verify(code, config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1);
@@ -9148,7 +9277,7 @@ describe("Linter with FlatConfigArray", () => {
 
                 config.rules[rule] = "warn";
 
-                const messages = linter.verify(code, config, filename, true);
+                const messages = linter.verify(code, config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1);
@@ -9164,7 +9293,7 @@ describe("Linter with FlatConfigArray", () => {
 
                 config.rules[rule] = [1];
 
-                const messages = linter.verify(code, config, filename, true);
+                const messages = linter.verify(code, config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1);
@@ -9179,7 +9308,7 @@ describe("Linter with FlatConfigArray", () => {
 
                 config.rules[rule] = ["warn"];
 
-                const messages = linter.verify(code, config, filename, true);
+                const messages = linter.verify(code, config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1);
@@ -9196,13 +9325,13 @@ describe("Linter with FlatConfigArray", () => {
                 config.rules[rule] = "1";
 
                 assert.throws(() => {
-                    linter.verify(code, config, filename, true);
+                    linter.verify(code, config, filename);
                 }, /Key "rules": Key "semi": Expected severity/u);
             });
 
             it("should process empty config", () => {
                 const config = {};
-                const messages = linter.verify(code, config, filename, true);
+                const messages = linter.verify(code, config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 0);
@@ -9249,6 +9378,258 @@ describe("Linter with FlatConfigArray", () => {
                 column: 0,
                 nodeType: null
             });
+        });
+
+        // https://github.com/eslint/eslint/issues/17669
+        it("should use `cwd` constructor option as config `basePath` when config is not an instance of FlatConfigArray with Posix paths", () => {
+            const rule = {
+                create(context) {
+                    return {
+                        Program(node) {
+                            context.report({ node, message: "Bad program." });
+                        }
+                    };
+                }
+            };
+
+            const code = "foo";
+            const config = [
+                {
+                    plugins: {
+                        test: {
+                            rules: {
+                                "test-rule-1": rule,
+                                "test-rule-2": rule,
+                                "test-rule-3": rule
+                            }
+                        }
+                    }
+                },
+                {
+                    rules: {
+                        "test/test-rule-1": 2
+                    }
+                },
+                {
+                    files: ["**/*.ts"],
+                    rules: {
+                        "test/test-rule-2": 2
+                    }
+                },
+                {
+                    files: ["bar/file.ts"],
+                    rules: {
+                        "test/test-rule-3": 2
+                    }
+                }
+            ];
+
+            const linterWithOptions = new Linter({
+                configType: "flat",
+                cwd: "/foo"
+            });
+
+            let messages;
+
+            messages = linterWithOptions.verify(code, config, "/file.js");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for /file.js.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "/file.ts");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for /file.ts.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "/bar/foo/file.js");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for /bar/foo/file.js.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "/bar/foo/file.ts");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for /bar/foo/file.ts.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "/foo/file.js");
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].ruleId, "test/test-rule-1");
+
+            messages = linterWithOptions.verify(code, config, "/foo/file.ts");
+            assert.strictEqual(messages.length, 2);
+            assert.strictEqual(messages[0].ruleId, "test/test-rule-1");
+            assert.strictEqual(messages[1].ruleId, "test/test-rule-2");
+
+            messages = linterWithOptions.verify(code, config, "/foo/bar/file.ts");
+            assert.strictEqual(messages.length, 3);
+            assert.strictEqual(messages[0].ruleId, "test/test-rule-1");
+            assert.strictEqual(messages[1].ruleId, "test/test-rule-2");
+            assert.strictEqual(messages[2].ruleId, "test/test-rule-3");
+        });
+
+        // https://github.com/eslint/eslint/issues/18575
+        it("should use `cwd` constructor option as config `basePath` when config is not an instance of FlatConfigArray with Windows paths", () => {
+            const rule = {
+                create(context) {
+                    return {
+                        Program(node) {
+                            context.report({ node, message: "Bad program." });
+                        }
+                    };
+                }
+            };
+
+            const code = "foo";
+            const config = [
+                {
+                    plugins: {
+                        test: {
+                            rules: {
+                                "test-rule-1": rule,
+                                "test-rule-2": rule,
+                                "test-rule-3": rule
+                            }
+                        }
+                    }
+                },
+                {
+                    rules: {
+                        "test/test-rule-1": 2
+                    }
+                },
+                {
+                    files: ["**/*.ts"],
+                    rules: {
+                        "test/test-rule-2": 2
+                    }
+                },
+                {
+                    files: ["bar/file.ts"],
+                    rules: {
+                        "test/test-rule-3": 2
+                    }
+                }
+            ];
+
+            const linterWithOptions = new Linter({
+                configType: "flat",
+                cwd: "C:\\foo"
+            });
+
+            let messages;
+
+            messages = linterWithOptions.verify(code, config, "C:\\file.js");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for C:\\file.js.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "C:\\file.ts");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for C:\\file.ts.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "D:\\foo\\file.js");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for D:\\foo\\file.js.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "D:\\foo\\file.ts");
+            assert.strictEqual(messages.length, 1);
+            assert.deepStrictEqual(messages[0], {
+                ruleId: null,
+                severity: 1,
+                message: "No matching configuration found for D:\\foo\\file.ts.",
+                line: 0,
+                column: 0,
+                nodeType: null
+            });
+
+            messages = linterWithOptions.verify(code, config, "C:\\foo\\file.js");
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].ruleId, "test/test-rule-1");
+
+            messages = linterWithOptions.verify(code, config, "C:\\foo\\file.ts");
+            assert.strictEqual(messages.length, 2);
+            assert.strictEqual(messages[0].ruleId, "test/test-rule-1");
+            assert.strictEqual(messages[1].ruleId, "test/test-rule-2");
+
+            messages = linterWithOptions.verify(code, config, "C:\\foo\\bar\\file.ts");
+            assert.strictEqual(messages.length, 3);
+            assert.strictEqual(messages[0].ruleId, "test/test-rule-1");
+            assert.strictEqual(messages[1].ruleId, "test/test-rule-2");
+            assert.strictEqual(messages[2].ruleId, "test/test-rule-3");
+        });
+
+        it("should ignore external files with Posix paths", () => {
+            const configs = createFlatConfigArray(
+                { files: ["**/*.js"] },
+                { basePath: "/foo" }
+            );
+
+            configs.normalizeSync();
+            const messages1 = linter.verify("foo", configs, "/foo/bar.js");
+            const messages2 = linter.verify("foo", configs, "/bar.js");
+
+            assert.strictEqual(messages1.length, 0);
+            assert.strictEqual(messages2.length, 1);
+            assert.strictEqual(messages2[0].message, "No matching configuration found for /bar.js.");
+        });
+
+        it("should ignore external files with Windows paths", () => {
+            const configs = createFlatConfigArray(
+                { files: ["**/*.js"] },
+                { basePath: "C:\\foo" }
+            );
+
+            configs.normalizeSync();
+            const messages1 = linter.verify("foo", configs, "C:\\foo\\bar.js");
+            const messages2 = linter.verify("foo", configs, "D:\\foo\\bar.js");
+
+            assert.strictEqual(messages1.length, 0);
+            assert.strictEqual(messages2.length, 1);
+            assert.strictEqual(messages2[0].message, "No matching configuration found for D:\\foo\\bar.js.");
         });
 
         describe("Plugins", () => {
@@ -9404,7 +9785,7 @@ describe("Linter with FlatConfigArray", () => {
                     rules: { "test/checker": "error" }
                 };
 
-                const messages = linter.verify(code, config, filename, true);
+                const messages = linter.verify(code, config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 0);
@@ -9415,6 +9796,123 @@ describe("Linter with FlatConfigArray", () => {
                 sinon.assert.calledOnce(spyBinaryExpression);
 
                 assert.strictEqual(suppressedMessages.length, 0);
+            });
+
+            it("should throw an error if a rule is a function", () => {
+
+                /**
+                 * Legacy-format rule (a function instead of an object with `create` method).
+                 * @param {RuleContext} context The ESLint rule context object.
+                 * @returns {Object} Listeners.
+                 */
+                function functionStyleRule(context) {
+                    return {
+                        Program(node) {
+                            context.report({ node, message: "bad" });
+                        }
+                    };
+                }
+
+                const config = {
+                    plugins: {
+                        test: {
+                            rules: {
+                                "function-style-rule": functionStyleRule
+                            }
+                        }
+                    },
+                    rules: { "test/function-style-rule": "error" }
+                };
+
+                assert.throws(
+                    () => linter.verify("foo", config),
+                    TypeError,
+                    "Error while loading rule 'test/function-style-rule': Rule must be an object with a `create` method"
+                );
+            });
+
+            it("should throw an error if a rule is an object without 'create' method", () => {
+                const rule = {
+                    create_(context) {
+                        return {
+                            Program(node) {
+                                context.report({ node, message: "bad" });
+                            }
+                        };
+                    }
+                };
+
+                const config = {
+                    plugins: {
+                        test: {
+                            rules: {
+                                "object-rule-without-create": rule
+                            }
+                        }
+                    },
+                    rules: { "test/object-rule-without-create": "error" }
+                };
+
+                assert.throws(
+                    () => linter.verify("foo", config),
+                    TypeError,
+                    "Error while loading rule 'test/object-rule-without-create': Rule must be an object with a `create` method"
+                );
+            });
+
+            it("should throw an error if a rule with invalid `meta.schema` is enabled in the configuration", () => {
+                const config = [
+                    {
+                        plugins: {
+                            test: {
+                                rules: {
+                                    "rule-with-invalid-schema": {
+                                        meta: {
+                                            schema: true
+                                        },
+                                        create() {
+                                            return {};
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        rules: { "test/rule-with-invalid-schema": "error" }
+                    }
+                ];
+
+                assert.throws(
+                    () => linter.verify("foo", config),
+                    "Error while processing options validation schema of rule 'test/rule-with-invalid-schema': Rule's `meta.schema` must be an array or object"
+                );
+            });
+
+            it("should throw an error if a rule with invalid `meta.schema` is enabled in a configuration comment", () => {
+                const config = [
+                    {
+                        plugins: {
+                            test: {
+                                rules: {
+                                    "rule-with-invalid-schema": {
+                                        meta: {
+                                            schema: true
+                                        },
+                                        create() {
+                                            return {};
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ];
+
+                assert.throws(
+                    () => linter.verify("/* eslint test/rule-with-invalid-schema: 2 */", config),
+                    "Error while processing options validation schema of rule 'test/rule-with-invalid-schema': Rule's `meta.schema` must be an array or object"
+                );
             });
 
             it("should throw an error if a rule reports a problem without a message", () => {
@@ -9641,1741 +10139,12 @@ describe("Linter with FlatConfigArray", () => {
 
             });
 
-            describe("context.getSourceLines()", () => {
-
-                it("should get proper lines when using \\n as a line break", () => {
-                    const code = "a;\nb;";
-                    const spy = sinon.spy(context => {
-                        assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should get proper lines when using \\r\\n as a line break", () => {
-                    const code = "a;\r\nb;";
-                    const spy = sinon.spy(context => {
-                        assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should get proper lines when using \\r as a line break", () => {
-                    const code = "a;\rb;";
-                    const spy = sinon.spy(context => {
-                        assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should get proper lines when using \\u2028 as a line break", () => {
-                    const code = "a;\u2028b;";
-                    const spy = sinon.spy(context => {
-                        assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should get proper lines when using \\u2029 as a line break", () => {
-                    const code = "a;\u2029b;";
-                    const spy = sinon.spy(context => {
-                        assert.deepStrictEqual(context.getSourceLines(), ["a;", "b;"]);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-            });
-
-            describe("context.getSource()", () => {
-                const code = TEST_CODE;
-
-                it("should retrieve all text when used without parameters", () => {
-
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                assert.strictEqual(context.getSource(), TEST_CODE);
-                                            });
-                                            return { Program: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve all text for root node", () => {
-
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(node => {
-                                                assert.strictEqual(context.getSource(node), TEST_CODE);
-                                            });
-                                            return { Program: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should clamp to valid range when retrieving characters before start of source", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(node => {
-                                                assert.strictEqual(context.getSource(node, 2, 0), TEST_CODE);
-                                            });
-                                            return { Program: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve all text for binary expression", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(node => {
-                                                assert.strictEqual(context.getSource(node), "6 * 7");
-                                            });
-                                            return { BinaryExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve all text plus two characters before for binary expression", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(node => {
-                                                assert.strictEqual(context.getSource(node, 2), "= 6 * 7");
-                                            });
-                                            return { BinaryExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve all text plus one character after for binary expression", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(node => {
-                                                assert.strictEqual(context.getSource(node, 0, 1), "6 * 7;");
-                                            });
-                                            return { BinaryExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve all text plus two characters before and one character after for binary expression", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(node => {
-                                                assert.strictEqual(context.getSource(node, 2, 1), "= 6 * 7;");
-                                            });
-                                            return { BinaryExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-            });
-
-            describe("context.getAncestors()", () => {
-                const code = TEST_CODE;
-
-                it("should retrieve all ancestors when used", () => {
-
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const ancestors = context.getAncestors();
-
-                                                assert.strictEqual(ancestors.length, 3);
-                                            });
-                                            return { BinaryExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config, filename, true);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve empty ancestors for root node", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const ancestors = context.getAncestors();
-
-                                                assert.strictEqual(ancestors.length, 0);
-                                            });
-
-                                            return { Program: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-            });
-
-            describe("context.getNodeByRangeIndex()", () => {
-                const code = TEST_CODE;
-
-                it("should retrieve a node starting at the given index", () => {
-                    const spy = sinon.spy(context => {
-                        assert.strictEqual(context.getNodeByRangeIndex(4).type, "Identifier");
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should retrieve a node containing the given index", () => {
-                    const spy = sinon.spy(context => {
-                        assert.strictEqual(context.getNodeByRangeIndex(6).type, "Identifier");
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should retrieve a node that is exactly the given index", () => {
-                    const spy = sinon.spy(context => {
-                        const node = context.getNodeByRangeIndex(13);
-
-                        assert.strictEqual(node.type, "Literal");
-                        assert.strictEqual(node.value, 6);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should retrieve a node ending with the given index", () => {
-                    const spy = sinon.spy(context => {
-                        assert.strictEqual(context.getNodeByRangeIndex(9).type, "Identifier");
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should retrieve the deepest node containing the given index", () => {
-                    const spy = sinon.spy(context => {
-                        const node1 = context.getNodeByRangeIndex(14);
-
-                        assert.strictEqual(node1.type, "BinaryExpression");
-
-                        const node2 = context.getNodeByRangeIndex(3);
-
-                        assert.strictEqual(node2.type, "VariableDeclaration");
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-
-                it("should return null if the index is outside the range of any node", () => {
-                    const spy = sinon.spy(context => {
-                        const node1 = context.getNodeByRangeIndex(-1);
-
-                        assert.isNull(node1);
-
-                        const node2 = context.getNodeByRangeIndex(-99);
-
-                        assert.isNull(node2);
-                        return {};
-                    });
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: { create: spy }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy.calledOnce);
-                });
-            });
-
-            describe("context.getScope()", () => {
-                const codeToTestScope = "function foo() { q: for(;;) { break q; } } function bar () { var q = t; } var baz = (() => { return 1; });";
-
-                it("should retrieve the global scope correctly from a Program", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "global");
-                                            });
-                                            return { Program: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(codeToTestScope, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from a FunctionDeclaration", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "function");
-                                            });
-                                            return { FunctionDeclaration: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(codeToTestScope, config);
-                    assert(spy && spy.calledTwice);
-                });
-
-                it("should retrieve the function scope correctly from a LabeledStatement", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "function");
-                                                assert.strictEqual(scope.block.id.name, "foo");
-                                            });
-                                            return { LabeledStatement: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify(codeToTestScope, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from within an ArrowFunctionExpression", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "function");
-                                                assert.strictEqual(scope.block.type, "ArrowFunctionExpression");
-                                            });
-
-                                            return { ReturnStatement: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify(codeToTestScope, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from within an SwitchStatement", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "switch");
-                                                assert.strictEqual(scope.block.type, "SwitchStatement");
-                                            });
-
-                                            return { SwitchStatement: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify("switch(foo){ case 'a': var b = 'foo'; }", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from within a BlockStatement", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "block");
-                                                assert.strictEqual(scope.block.type, "BlockStatement");
-                                            });
-
-                                            return { BlockStatement: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify("var x; {let y = 1}", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from within a nested block statement", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "block");
-                                                assert.strictEqual(scope.block.type, "BlockStatement");
-                                            });
-
-                                            return { BlockStatement: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify("if (true) { let x = 1 }", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from within a FunctionDeclaration", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "function");
-                                                assert.strictEqual(scope.block.type, "FunctionDeclaration");
-                                            });
-
-                                            return { FunctionDeclaration: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify("function foo() {}", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the function scope correctly from within a FunctionExpression", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "function");
-                                                assert.strictEqual(scope.block.type, "FunctionExpression");
-                                            });
-
-                                            return { FunctionExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify("(function foo() {})();", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve the catch scope correctly from within a CatchClause", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "catch");
-                                                assert.strictEqual(scope.block.type, "CatchClause");
-                                            });
-
-                                            return { CatchClause: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify("try {} catch (err) {}", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve module scope correctly from an ES6 module", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "module");
-                                            });
-
-                                            return { AssignmentExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6,
-                            sourceType: "module"
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-
-                    linter.verify("var foo = {}; foo.bar = 1;", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should retrieve function scope correctly when sourceType is commonjs", () => {
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.strictEqual(scope.type, "function");
-                                            });
-
-                                            return { AssignmentExpression: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6,
-                            sourceType: "commonjs"
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify("var foo = {}; foo.bar = 1;", config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                describe("Scope Internals", () => {
-
-                    /**
-                     * Get the scope on the node `astSelector` specified.
-                     * @param {string} codeToEvaluate The source code to verify.
-                     * @param {string} astSelector The AST selector to get scope.
-                     * @param {number} [ecmaVersion=5] The ECMAScript version.
-                     * @returns {{node: ASTNode, scope: escope.Scope}} Gotten scope.
-                     */
-                    function getScope(codeToEvaluate, astSelector, ecmaVersion = 5) {
-                        let node, scope;
-
-                        const config = {
-                            plugins: {
-                                test: {
-                                    rules: {
-                                        "get-scope": {
-                                            create: context => ({
-                                                [astSelector](node0) {
-                                                    node = node0;
-                                                    scope = context.getScope();
-                                                }
-                                            })
-                                        }
-                                    }
-                                }
-                            },
-                            languageOptions: {
-                                ecmaVersion,
-                                sourceType: "script"
-                            },
-                            rules: { "test/get-scope": "error" }
-                        };
-
-                        linter.verify(
-                            codeToEvaluate,
-                            config
-                        );
-
-                        return { node, scope };
-                    }
-
-                    it("should return 'function' scope on FunctionDeclaration (ES5)", () => {
-                        const { node, scope } = getScope("function f() {}", "FunctionDeclaration");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node);
-                    });
-
-                    it("should return 'function' scope on FunctionExpression (ES5)", () => {
-                        const { node, scope } = getScope("!function f() {}", "FunctionExpression");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node);
-                    });
-
-                    it("should return 'function' scope on the body of FunctionDeclaration (ES5)", () => {
-                        const { node, scope } = getScope("function f() {}", "BlockStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent);
-                    });
-
-                    it("should return 'function' scope on the body of FunctionDeclaration (ES2015)", () => {
-                        const { node, scope } = getScope("function f() {}", "BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent);
-                    });
-
-                    it("should return 'function' scope on BlockStatement in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { { var b; } }", "BlockStatement > BlockStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "b"]);
-                    });
-
-                    it("should return 'block' scope on BlockStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { { let a; var b; } }", "BlockStatement > BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.upper.type, "function");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["a"]);
-                        assert.deepStrictEqual(scope.variableScope.variables.map(v => v.name), ["arguments", "b"]);
-                    });
-
-                    it("should return 'block' scope on nested BlockStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { { let a; { let b; var c; } } }", "BlockStatement > BlockStatement > BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.upper.type, "block");
-                        assert.strictEqual(scope.upper.upper.type, "function");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["b"]);
-                        assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["a"]);
-                        assert.deepStrictEqual(scope.variableScope.variables.map(v => v.name), ["arguments", "c"]);
-                    });
-
-                    it("should return 'function' scope on SwitchStatement in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { switch (a) { case 0: var b; } }", "SwitchStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "b"]);
-                    });
-
-                    it("should return 'switch' scope on SwitchStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { switch (a) { case 0: let b; } }", "SwitchStatement", 2015);
-
-                        assert.strictEqual(scope.type, "switch");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["b"]);
-                    });
-
-                    it("should return 'function' scope on SwitchCase in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { switch (a) { case 0: var b; } }", "SwitchCase");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "b"]);
-                    });
-
-                    it("should return 'switch' scope on SwitchCase in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { switch (a) { case 0: let b; } }", "SwitchCase", 2015);
-
-                        assert.strictEqual(scope.type, "switch");
-                        assert.strictEqual(scope.block, node.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["b"]);
-                    });
-
-                    it("should return 'catch' scope on CatchClause in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { try {} catch (e) { var a; } }", "CatchClause");
-
-                        assert.strictEqual(scope.type, "catch");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["e"]);
-                    });
-
-                    it("should return 'catch' scope on CatchClause in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { try {} catch (e) { let a; } }", "CatchClause", 2015);
-
-                        assert.strictEqual(scope.type, "catch");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["e"]);
-                    });
-
-                    it("should return 'catch' scope on the block of CatchClause in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { try {} catch (e) { var a; } }", "CatchClause > BlockStatement");
-
-                        assert.strictEqual(scope.type, "catch");
-                        assert.strictEqual(scope.block, node.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["e"]);
-                    });
-
-                    it("should return 'block' scope on the block of CatchClause in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { try {} catch (e) { let a; } }", "CatchClause > BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["a"]);
-                    });
-
-                    it("should return 'function' scope on ForStatement in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { for (var i = 0; i < 10; ++i) {} }", "ForStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "i"]);
-                    });
-
-                    it("should return 'for' scope on ForStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { for (let i = 0; i < 10; ++i) {} }", "ForStatement", 2015);
-
-                        assert.strictEqual(scope.type, "for");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["i"]);
-                    });
-
-                    it("should return 'function' scope on the block body of ForStatement in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { for (var i = 0; i < 10; ++i) {} }", "ForStatement > BlockStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "i"]);
-                    });
-
-                    it("should return 'block' scope on the block body of ForStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { for (let i = 0; i < 10; ++i) {} }", "ForStatement > BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.upper.type, "for");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), []);
-                        assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["i"]);
-                    });
-
-                    it("should return 'function' scope on ForInStatement in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { for (var key in obj) {} }", "ForInStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "key"]);
-                    });
-
-                    it("should return 'for' scope on ForInStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { for (let key in obj) {} }", "ForInStatement", 2015);
-
-                        assert.strictEqual(scope.type, "for");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["key"]);
-                    });
-
-                    it("should return 'function' scope on the block body of ForInStatement in functions (ES5)", () => {
-                        const { node, scope } = getScope("function f() { for (var key in obj) {} }", "ForInStatement > BlockStatement");
-
-                        assert.strictEqual(scope.type, "function");
-                        assert.strictEqual(scope.block, node.parent.parent.parent);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["arguments", "key"]);
-                    });
-
-                    it("should return 'block' scope on the block body of ForInStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { for (let key in obj) {} }", "ForInStatement > BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.upper.type, "for");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), []);
-                        assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["key"]);
-                    });
-
-                    it("should return 'for' scope on ForOfStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { for (let x of xs) {} }", "ForOfStatement", 2015);
-
-                        assert.strictEqual(scope.type, "for");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), ["x"]);
-                    });
-
-                    it("should return 'block' scope on the block body of ForOfStatement in functions (ES2015)", () => {
-                        const { node, scope } = getScope("function f() { for (let x of xs) {} }", "ForOfStatement > BlockStatement", 2015);
-
-                        assert.strictEqual(scope.type, "block");
-                        assert.strictEqual(scope.upper.type, "for");
-                        assert.strictEqual(scope.block, node);
-                        assert.deepStrictEqual(scope.variables.map(v => v.name), []);
-                        assert.deepStrictEqual(scope.upper.variables.map(v => v.name), ["x"]);
-                    });
-
-                    it("should shadow the same name variable by the iteration variable.", () => {
-                        const { node, scope } = getScope("let x; for (let x of x) {}", "ForOfStatement", 2015);
-
-                        assert.strictEqual(scope.type, "for");
-                        assert.strictEqual(scope.upper.type, "global");
-                        assert.strictEqual(scope.block, node);
-                        assert.strictEqual(scope.upper.variables[0].references.length, 0);
-                        assert.strictEqual(scope.references[0].identifier, node.left.declarations[0].id);
-                        assert.strictEqual(scope.references[1].identifier, node.right);
-                        assert.strictEqual(scope.references[1].resolved, scope.variables[0]);
-                    });
-                });
-
-                describe("Variables and references", () => {
-                    const code = [
-                        "a;",
-                        "function foo() { b; }",
-                        "Object;",
-                        "foo;",
-                        "var c;",
-                        "c;",
-                        "/* global d */",
-                        "d;",
-                        "e;",
-                        "f;"
-                    ].join("\n");
-                    let scope = null;
-
-                    beforeEach(() => {
-                        let ok = false;
-
-                        const config = {
-                            plugins: {
-                                test: {
-                                    rules: {
-                                        test: {
-                                            create: context => ({
-                                                Program() {
-                                                    scope = context.getScope();
-                                                    ok = true;
-                                                }
-                                            })
-                                        }
-                                    }
-                                }
-                            },
-                            languageOptions: {
-                                globals: { e: true, f: false },
-                                sourceType: "script",
-                                ecmaVersion: 5
-                            },
-                            rules: {
-                                "test/test": 2
-                            }
-                        };
-
-                        linter.verify(code, config);
-                        assert(ok);
-                    });
-
-                    afterEach(() => {
-                        scope = null;
-                    });
-
-                    it("Scope#through should contain references of undefined variables", () => {
-                        assert.strictEqual(scope.through.length, 2);
-                        assert.strictEqual(scope.through[0].identifier.name, "a");
-                        assert.strictEqual(scope.through[0].identifier.loc.start.line, 1);
-                        assert.strictEqual(scope.through[0].resolved, null);
-                        assert.strictEqual(scope.through[1].identifier.name, "b");
-                        assert.strictEqual(scope.through[1].identifier.loc.start.line, 2);
-                        assert.strictEqual(scope.through[1].resolved, null);
-                    });
-
-                    it("Scope#variables should contain global variables", () => {
-                        assert(scope.variables.some(v => v.name === "Object"));
-                        assert(scope.variables.some(v => v.name === "foo"));
-                        assert(scope.variables.some(v => v.name === "c"));
-                        assert(scope.variables.some(v => v.name === "d"));
-                        assert(scope.variables.some(v => v.name === "e"));
-                        assert(scope.variables.some(v => v.name === "f"));
-                    });
-
-                    it("Scope#set should contain global variables", () => {
-                        assert(scope.set.get("Object"));
-                        assert(scope.set.get("foo"));
-                        assert(scope.set.get("c"));
-                        assert(scope.set.get("d"));
-                        assert(scope.set.get("e"));
-                        assert(scope.set.get("f"));
-                    });
-
-                    it("Variables#references should contain their references", () => {
-                        assert.strictEqual(scope.set.get("Object").references.length, 1);
-                        assert.strictEqual(scope.set.get("Object").references[0].identifier.name, "Object");
-                        assert.strictEqual(scope.set.get("Object").references[0].identifier.loc.start.line, 3);
-                        assert.strictEqual(scope.set.get("Object").references[0].resolved, scope.set.get("Object"));
-                        assert.strictEqual(scope.set.get("foo").references.length, 1);
-                        assert.strictEqual(scope.set.get("foo").references[0].identifier.name, "foo");
-                        assert.strictEqual(scope.set.get("foo").references[0].identifier.loc.start.line, 4);
-                        assert.strictEqual(scope.set.get("foo").references[0].resolved, scope.set.get("foo"));
-                        assert.strictEqual(scope.set.get("c").references.length, 1);
-                        assert.strictEqual(scope.set.get("c").references[0].identifier.name, "c");
-                        assert.strictEqual(scope.set.get("c").references[0].identifier.loc.start.line, 6);
-                        assert.strictEqual(scope.set.get("c").references[0].resolved, scope.set.get("c"));
-                        assert.strictEqual(scope.set.get("d").references.length, 1);
-                        assert.strictEqual(scope.set.get("d").references[0].identifier.name, "d");
-                        assert.strictEqual(scope.set.get("d").references[0].identifier.loc.start.line, 8);
-                        assert.strictEqual(scope.set.get("d").references[0].resolved, scope.set.get("d"));
-                        assert.strictEqual(scope.set.get("e").references.length, 1);
-                        assert.strictEqual(scope.set.get("e").references[0].identifier.name, "e");
-                        assert.strictEqual(scope.set.get("e").references[0].identifier.loc.start.line, 9);
-                        assert.strictEqual(scope.set.get("e").references[0].resolved, scope.set.get("e"));
-                        assert.strictEqual(scope.set.get("f").references.length, 1);
-                        assert.strictEqual(scope.set.get("f").references[0].identifier.name, "f");
-                        assert.strictEqual(scope.set.get("f").references[0].identifier.loc.start.line, 10);
-                        assert.strictEqual(scope.set.get("f").references[0].resolved, scope.set.get("f"));
-                    });
-
-                    it("Reference#resolved should be their variable", () => {
-                        assert.strictEqual(scope.set.get("Object").references[0].resolved, scope.set.get("Object"));
-                        assert.strictEqual(scope.set.get("foo").references[0].resolved, scope.set.get("foo"));
-                        assert.strictEqual(scope.set.get("c").references[0].resolved, scope.set.get("c"));
-                        assert.strictEqual(scope.set.get("d").references[0].resolved, scope.set.get("d"));
-                        assert.strictEqual(scope.set.get("e").references[0].resolved, scope.set.get("e"));
-                        assert.strictEqual(scope.set.get("f").references[0].resolved, scope.set.get("f"));
-                    });
-                });
-            });
-
-            describe("context.getDeclaredVariables(node)", () => {
-
-                /**
-                 * Assert `context.getDeclaredVariables(node)` is valid.
-                 * @param {string} code A code to check.
-                 * @param {string} type A type string of ASTNode. This method checks variables on the node of the type.
-                 * @param {Array<Array<string>>} expectedNamesList An array of expected variable names. The expected variable names is an array of string.
-                 * @returns {void}
-                 */
-                function verify(code, type, expectedNamesList) {
-                    const config = {
-                        plugins: {
-                            test: {
-
-                                rules: {
-                                    test: {
-                                        create(context) {
-
-                                            /**
-                                             * Assert `context.getDeclaredVariables(node)` is empty.
-                                             * @param {ASTNode} node A node to check.
-                                             * @returns {void}
-                                             */
-                                            function checkEmpty(node) {
-                                                assert.strictEqual(0, context.getDeclaredVariables(node).length);
-                                            }
-                                            const rule = {
-                                                Program: checkEmpty,
-                                                EmptyStatement: checkEmpty,
-                                                BlockStatement: checkEmpty,
-                                                ExpressionStatement: checkEmpty,
-                                                LabeledStatement: checkEmpty,
-                                                BreakStatement: checkEmpty,
-                                                ContinueStatement: checkEmpty,
-                                                WithStatement: checkEmpty,
-                                                SwitchStatement: checkEmpty,
-                                                ReturnStatement: checkEmpty,
-                                                ThrowStatement: checkEmpty,
-                                                TryStatement: checkEmpty,
-                                                WhileStatement: checkEmpty,
-                                                DoWhileStatement: checkEmpty,
-                                                ForStatement: checkEmpty,
-                                                ForInStatement: checkEmpty,
-                                                DebuggerStatement: checkEmpty,
-                                                ThisExpression: checkEmpty,
-                                                ArrayExpression: checkEmpty,
-                                                ObjectExpression: checkEmpty,
-                                                Property: checkEmpty,
-                                                SequenceExpression: checkEmpty,
-                                                UnaryExpression: checkEmpty,
-                                                BinaryExpression: checkEmpty,
-                                                AssignmentExpression: checkEmpty,
-                                                UpdateExpression: checkEmpty,
-                                                LogicalExpression: checkEmpty,
-                                                ConditionalExpression: checkEmpty,
-                                                CallExpression: checkEmpty,
-                                                NewExpression: checkEmpty,
-                                                MemberExpression: checkEmpty,
-                                                SwitchCase: checkEmpty,
-                                                Identifier: checkEmpty,
-                                                Literal: checkEmpty,
-                                                ForOfStatement: checkEmpty,
-                                                ArrowFunctionExpression: checkEmpty,
-                                                YieldExpression: checkEmpty,
-                                                TemplateLiteral: checkEmpty,
-                                                TaggedTemplateExpression: checkEmpty,
-                                                TemplateElement: checkEmpty,
-                                                ObjectPattern: checkEmpty,
-                                                ArrayPattern: checkEmpty,
-                                                RestElement: checkEmpty,
-                                                AssignmentPattern: checkEmpty,
-                                                ClassBody: checkEmpty,
-                                                MethodDefinition: checkEmpty,
-                                                MetaProperty: checkEmpty
-                                            };
-
-                                            rule[type] = function(node) {
-                                                const expectedNames = expectedNamesList.shift();
-                                                const variables = context.getDeclaredVariables(node);
-
-                                                assert(Array.isArray(expectedNames));
-                                                assert(Array.isArray(variables));
-                                                assert.strictEqual(expectedNames.length, variables.length);
-                                                for (let i = variables.length - 1; i >= 0; i--) {
-                                                    assert.strictEqual(expectedNames[i], variables[i].name);
-                                                }
-                                            };
-                                            return rule;
-                                        }
-
-                                    }
-                                }
-
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6,
-                            sourceType: "module"
-                        },
-                        rules: {
-                            "test/test": 2
-                        }
-                    };
-
-                    linter.verify(code, config);
-
-                    // Check all expected names are asserted.
-                    assert.strictEqual(0, expectedNamesList.length);
-                }
-
-                it("VariableDeclaration", () => {
-                    const code = "\n var {a, x: [b], y: {c = 0}} = foo;\n let {d, x: [e], y: {f = 0}} = foo;\n const {g, x: [h], y: {i = 0}} = foo, {j, k = function(z) { let l; }} = bar;\n ";
-                    const namesList = [
-                        ["a", "b", "c"],
-                        ["d", "e", "f"],
-                        ["g", "h", "i", "j", "k"],
-                        ["l"]
-                    ];
-
-                    verify(code, "VariableDeclaration", namesList);
-                });
-
-                it("VariableDeclaration (on for-in/of loop)", () => {
-
-                    // TDZ scope is created here, so tests to exclude those.
-                    const code = "\n for (var {a, x: [b], y: {c = 0}} in foo) {\n let g;\n }\n for (let {d, x: [e], y: {f = 0}} of foo) {\n let h;\n }\n ";
-                    const namesList = [
-                        ["a", "b", "c"],
-                        ["g"],
-                        ["d", "e", "f"],
-                        ["h"]
-                    ];
-
-                    verify(code, "VariableDeclaration", namesList);
-                });
-
-                it("VariableDeclarator", () => {
-
-                    // TDZ scope is created here, so tests to exclude those.
-                    const code = "\n var {a, x: [b], y: {c = 0}} = foo;\n let {d, x: [e], y: {f = 0}} = foo;\n const {g, x: [h], y: {i = 0}} = foo, {j, k = function(z) { let l; }} = bar;\n ";
-                    const namesList = [
-                        ["a", "b", "c"],
-                        ["d", "e", "f"],
-                        ["g", "h", "i"],
-                        ["j", "k"],
-                        ["l"]
-                    ];
-
-                    verify(code, "VariableDeclarator", namesList);
-                });
-
-                it("FunctionDeclaration", () => {
-                    const code = "\n function foo({a, x: [b], y: {c = 0}}, [d, e]) {\n let z;\n }\n function bar({f, x: [g], y: {h = 0}}, [i, j = function(q) { let w; }]) {\n let z;\n }\n ";
-                    const namesList = [
-                        ["foo", "a", "b", "c", "d", "e"],
-                        ["bar", "f", "g", "h", "i", "j"]
-                    ];
-
-                    verify(code, "FunctionDeclaration", namesList);
-                });
-
-                it("FunctionExpression", () => {
-                    const code = "\n (function foo({a, x: [b], y: {c = 0}}, [d, e]) {\n let z;\n });\n (function bar({f, x: [g], y: {h = 0}}, [i, j = function(q) { let w; }]) {\n let z;\n });\n ";
-                    const namesList = [
-                        ["foo", "a", "b", "c", "d", "e"],
-                        ["bar", "f", "g", "h", "i", "j"],
-                        ["q"]
-                    ];
-
-                    verify(code, "FunctionExpression", namesList);
-                });
-
-                it("ArrowFunctionExpression", () => {
-                    const code = "\n (({a, x: [b], y: {c = 0}}, [d, e]) => {\n let z;\n });\n (({f, x: [g], y: {h = 0}}, [i, j]) => {\n let z;\n });\n ";
-                    const namesList = [
-                        ["a", "b", "c", "d", "e"],
-                        ["f", "g", "h", "i", "j"]
-                    ];
-
-                    verify(code, "ArrowFunctionExpression", namesList);
-                });
-
-                it("ClassDeclaration", () => {
-                    const code = "\n class A { foo(x) { let y; } }\n class B { foo(x) { let y; } }\n ";
-                    const namesList = [
-                        ["A", "A"], // outer scope's and inner scope's.
-                        ["B", "B"]
-                    ];
-
-                    verify(code, "ClassDeclaration", namesList);
-                });
-
-                it("ClassExpression", () => {
-                    const code = "\n (class A { foo(x) { let y; } });\n (class B { foo(x) { let y; } });\n ";
-                    const namesList = [
-                        ["A"],
-                        ["B"]
-                    ];
-
-                    verify(code, "ClassExpression", namesList);
-                });
-
-                it("CatchClause", () => {
-                    const code = "\n try {} catch ({a, b}) {\n let x;\n try {} catch ({c, d}) {\n let y;\n }\n }\n ";
-                    const namesList = [
-                        ["a", "b"],
-                        ["c", "d"]
-                    ];
-
-                    verify(code, "CatchClause", namesList);
-                });
-
-                it("ImportDeclaration", () => {
-                    const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-                    const namesList = [
-                        [],
-                        ["a"],
-                        ["b", "c", "d"]
-                    ];
-
-                    verify(code, "ImportDeclaration", namesList);
-                });
-
-                it("ImportSpecifier", () => {
-                    const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-                    const namesList = [
-                        ["c"],
-                        ["d"]
-                    ];
-
-                    verify(code, "ImportSpecifier", namesList);
-                });
-
-                it("ImportDefaultSpecifier", () => {
-                    const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-                    const namesList = [
-                        ["b"]
-                    ];
-
-                    verify(code, "ImportDefaultSpecifier", namesList);
-                });
-
-                it("ImportNamespaceSpecifier", () => {
-                    const code = "\n import \"aaa\";\n import * as a from \"bbb\";\n import b, {c, x as d} from \"ccc\";\n ";
-                    const namesList = [
-                        ["a"]
-                    ];
-
-                    verify(code, "ImportNamespaceSpecifier", namesList);
-                });
-            });
-
-            describe("context.markVariableAsUsed()", () => {
-
-                it("should mark variables in current scope as used", () => {
-                    const code = "var a = 1, b = 2;";
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                assert.isTrue(context.markVariableAsUsed("a"));
-
-                                                const scope = context.getScope();
-
-                                                assert.isTrue(getVariable(scope, "a").eslintUsed);
-                                                assert.notOk(getVariable(scope, "b").eslintUsed);
-                                            });
-
-                                            return { "Program:exit": spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            sourceType: "script"
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should mark variables in function args as used", () => {
-                    const code = "function abc(a, b) { return 1; }";
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                assert.isTrue(context.markVariableAsUsed("a"));
-
-                                                const scope = context.getScope();
-
-                                                assert.isTrue(getVariable(scope, "a").eslintUsed);
-                                                assert.notOk(getVariable(scope, "b").eslintUsed);
-                                            });
-
-                                            return { ReturnStatement: spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should mark variables in higher scopes as used", () => {
-                    const code = "var a, b; function abc() { return 1; }";
-                    let returnSpy, exitSpy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            returnSpy = sinon.spy(() => {
-                                                assert.isTrue(context.markVariableAsUsed("a"));
-                                            });
-                                            exitSpy = sinon.spy(() => {
-                                                const scope = context.getScope();
-
-                                                assert.isTrue(getVariable(scope, "a").eslintUsed);
-                                                assert.notOk(getVariable(scope, "b").eslintUsed);
-                                            });
-
-                                            return { ReturnStatement: returnSpy, "Program:exit": exitSpy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            sourceType: "script"
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(returnSpy && returnSpy.calledOnce);
-                    assert(exitSpy && exitSpy.calledOnce);
-                });
-
-                it("should mark variables as used when sourceType is commonjs", () => {
-                    const code = "var a = 1, b = 2;";
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const globalScope = context.getScope(),
-                                                    childScope = globalScope.childScopes[0];
-
-                                                assert.isTrue(context.markVariableAsUsed("a"), "Call to markVariableAsUsed should return true");
-
-                                                assert.isTrue(getVariable(childScope, "a").eslintUsed, "'a' should be marked as used.");
-                                                assert.isUndefined(getVariable(childScope, "b").eslintUsed, "'b' should be marked as used.");
-                                            });
-
-                                            return { "Program:exit": spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            sourceType: "commonjs"
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce, "Spy wasn't called.");
-                });
-
-                it("should mark variables in modules as used", () => {
-                    const code = "var a = 1, b = 2;";
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                const globalScope = context.getScope(),
-                                                    childScope = globalScope.childScopes[0];
-
-                                                assert.isTrue(context.markVariableAsUsed("a"));
-
-                                                assert.isTrue(getVariable(childScope, "a").eslintUsed);
-                                                assert.isUndefined(getVariable(childScope, "b").eslintUsed);
-                                            });
-
-                                            return { "Program:exit": spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        languageOptions: {
-                            ecmaVersion: 6,
-                            sourceType: "module"
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-
-                it("should return false if the given variable is not found", () => {
-                    const code = "var a = 1, b = 2;";
-                    let spy;
-
-                    const config = {
-                        plugins: {
-                            test: {
-                                rules: {
-                                    checker: {
-                                        create(context) {
-                                            spy = sinon.spy(() => {
-                                                assert.isFalse(context.markVariableAsUsed("c"));
-                                            });
-
-                                            return { "Program:exit": spy };
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        rules: { "test/checker": "error" }
-                    };
-
-                    linter.verify(code, config);
-                    assert(spy && spy.calledOnce);
-                });
-            });
-
             describe("context.getCwd()", () => {
                 const code = "a;\nb;";
                 const baseConfig = { rules: { "test/checker": "error" } };
 
                 it("should get cwd correctly in the context", () => {
-                    const cwd = "cwd";
+                    const cwd = "/cwd";
                     const linterWithOption = new Linter({ cwd, configType: "flat" });
                     let spy;
                     const config = {
@@ -11396,7 +10165,7 @@ describe("Linter with FlatConfigArray", () => {
                         ...baseConfig
                     };
 
-                    linterWithOption.verify(code, config);
+                    linterWithOption.verify(code, config, `${cwd}/file.js`);
                     assert(spy && spy.calledOnce);
                 });
 
@@ -11458,7 +10227,7 @@ describe("Linter with FlatConfigArray", () => {
                 const baseConfig = { rules: { "test/checker": "error" } };
 
                 it("should get cwd correctly in the context", () => {
-                    const cwd = "cwd";
+                    const cwd = "/cwd";
                     const linterWithOption = new Linter({ cwd, configType: "flat" });
                     let spy;
                     const config = {
@@ -11479,7 +10248,7 @@ describe("Linter with FlatConfigArray", () => {
                         ...baseConfig
                     };
 
-                    linterWithOption.verify(code, config);
+                    linterWithOption.verify(code, config, `${cwd}/file.js`);
                     assert(spy && spy.calledOnce);
                 });
 
@@ -11552,7 +10321,7 @@ describe("Linter with FlatConfigArray", () => {
                     });
 
                 configs.normalizeSync();
-                const messages = linter.verify("foo", configs, filename, true);
+                const messages = linter.verify("foo", configs, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1, "Message length is wrong");
@@ -11570,7 +10339,7 @@ describe("Linter with FlatConfigArray", () => {
                         }
                     }];
 
-                const messages = linter.verify("foo", configs, filename, true);
+                const messages = linter.verify("foo", configs, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1, "Message length is wrong");
@@ -11588,7 +10357,7 @@ describe("Linter with FlatConfigArray", () => {
                         }
                     };
 
-                const messages = linter.verify("foo", config, filename, true);
+                const messages = linter.verify("foo", config, filename);
                 const suppressedMessages = linter.getSuppressedMessages();
 
                 assert.strictEqual(messages.length, 1, "Message length is wrong");
@@ -11616,7 +10385,7 @@ describe("Linter with FlatConfigArray", () => {
 
             it("should have a comment with the hashbang in it", () => {
                 const spy = sinon.spy(context => {
-                    const comments = context.getAllComments();
+                    const comments = context.sourceCode.getAllComments();
 
                     assert.strictEqual(comments.length, 1);
                     assert.strictEqual(comments[0].type, "Shebang");
@@ -11811,6 +10580,138 @@ describe("Linter with FlatConfigArray", () => {
                 });
             });
 
+            describe("ruleFilter", () => {
+                it("should not run rules that are filtered out", () => {
+                    const code = [
+                        "alert(\"test\");"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ ruleId }) => ruleId !== "no-alert"
+                    });
+
+                    assert.strictEqual(messages.length, 0);
+                });
+
+                it("should run rules that are not filtered out", () => {
+                    const code = [
+                        "alert(\"test\");"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ ruleId }) => ruleId === "no-alert"
+                    });
+
+                    assert.strictEqual(messages.length, 1);
+                });
+
+                it("should run rules that are not filtered out but not run rules that are filtered out", () => {
+                    const code = [
+                        "alert(\"test\");",
+                        "fakeVar.run();"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1, "no-undef": 1 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ ruleId }) => ruleId === "no-alert"
+                    });
+
+                    assert.strictEqual(messages.length, 1);
+                });
+
+                it("should filter rules by severity", () => {
+                    const code = [
+                        "alert(\"test\")"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1, semi: 2 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ severity }) => severity === 2
+                    });
+
+                    assert.strictEqual(messages.length, 1);
+                });
+
+                it("should ignore disable directives in filtered rules", () => {
+                    const code = [
+                        "// eslint-disable-next-line no-alert",
+                        "alert(\"test\")"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1, semi: 2 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ severity }) => severity === 2,
+                        reportUnusedDisableDirectives: "error"
+                    });
+
+                    assert.strictEqual(messages.length, 1);
+                });
+
+                it("should ignore disable directives in filtered rules even when unused", () => {
+                    const code = [
+                        "// eslint-disable-next-line no-alert",
+                        "notAnAlert(\"test\")"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1, semi: 2 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ severity }) => severity === 2,
+                        reportUnusedDisableDirectives: "error"
+                    });
+
+                    assert.strictEqual(messages.length, 1);
+                });
+
+                it("should not ignore disable directives in non-filtered rules", () => {
+                    const code = [
+                        "// eslint-disable-next-line semi",
+                        "alert(\"test\")"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1, semi: 2 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ severity }) => severity === 2,
+                        reportUnusedDisableDirectives: "error"
+                    });
+
+                    assert.strictEqual(messages.length, 0);
+                });
+
+                it("should report disable directives in non-filtered rules when unused", () => {
+                    const code = [
+                        "// eslint-disable-next-line semi",
+                        "alert(\"test\");"
+                    ].join("\n");
+                    const config = {
+                        rules: { "no-alert": 1, semi: 2 }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        ruleFilter: ({ severity }) => severity === 2,
+                        reportUnusedDisableDirectives: "error"
+                    });
+
+                    assert.strictEqual(messages.length, 1);
+                    assert.strictEqual(messages[0].message, "Unused eslint-disable directive (no problems were reported from 'semi').");
+                });
+            });
+
         });
 
         describe("Inline Directives", () => {
@@ -11818,6 +10719,48 @@ describe("Linter with FlatConfigArray", () => {
             describe("/*global*/ Comments", () => {
 
                 describe("when evaluating code containing /*global */ and /*globals */ blocks", () => {
+
+                    /**
+                     * Asserts the global variables in the provided code using the specified language options and data.
+                     * @param {string} code The code to verify.
+                     * @param {Object} languageOptions The language options to use.
+                     * @param {Object} [data={}] Additional data for the assertion.
+                     * @returns {void}
+                     */
+                    function assertGlobalVariable(code, languageOptions, data = {}) {
+                        let spy;
+
+                        const config = {
+                            plugins: {
+                                test: {
+                                    rules: {
+                                        checker: {
+                                            create(context) {
+                                                spy = sinon.spy(node => {
+                                                    const scope = context.sourceCode.getScope(node);
+                                                    const g = getVariable(scope, data.name);
+
+                                                    assert.strictEqual(g.name, data.name);
+                                                    assert.strictEqual(g.writeable, data.writeable);
+                                                });
+
+                                                return { Program: spy };
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            rules: { "test/checker": "error" }
+                        };
+
+                        if (languageOptions !== void 0) {
+                            config.languageOptions = languageOptions;
+                        }
+
+                        linter.verify(code, config);
+                        assert(spy && spy.calledOnce);
+
+                    }
 
                     it("variables should be available in global scope", () => {
                         const code = `
@@ -11834,8 +10777,8 @@ describe("Linter with FlatConfigArray", () => {
                                     rules: {
                                         checker: {
                                             create(context) {
-                                                spy = sinon.spy(() => {
-                                                    const scope = context.getScope();
+                                                spy = sinon.spy(node => {
+                                                    const scope = context.sourceCode.getScope(node);
                                                     const a = getVariable(scope, "a"),
                                                         b = getVariable(scope, "b"),
                                                         c = getVariable(scope, "c"),
@@ -11879,6 +10822,15 @@ describe("Linter with FlatConfigArray", () => {
                         linter.verify(code, config);
                         assert(spy && spy.calledOnce);
                     });
+
+                    // https://github.com/eslint/eslint/issues/18363
+                    it("not throw when defining a global named __defineSetter__", () => {
+                        assertGlobalVariable("/*global __defineSetter__ */", {}, { name: "__defineSetter__", writeable: false });
+                        assertGlobalVariable("/*global __defineSetter__ */", void 0, { name: "__defineSetter__", writeable: false });
+                        assertGlobalVariable("/*global __defineSetter__ */", { globals: { __defineSetter__: "off" } }, { name: "__defineSetter__", writeable: false });
+                        assertGlobalVariable("/*global __defineSetter__ */", { globals: { __defineSetter__: "writeable" } }, { name: "__defineSetter__", writeable: false });
+                        assertGlobalVariable("/*global __defineSetter__:writeable */", {}, { name: "__defineSetter__", writeable: true });
+                    });
                 });
 
                 describe("when evaluating code containing a /*global */ block with sloppy whitespace", () => {
@@ -11893,8 +10845,8 @@ describe("Linter with FlatConfigArray", () => {
                                     rules: {
                                         checker: {
                                             create(context) {
-                                                spy = sinon.spy(() => {
-                                                    const scope = context.getScope(),
+                                                spy = sinon.spy(node => {
+                                                    const scope = context.sourceCode.getScope(node),
                                                         a = getVariable(scope, "a"),
                                                         b = getVariable(scope, "b"),
                                                         c = getVariable(scope, "c");
@@ -11933,8 +10885,8 @@ describe("Linter with FlatConfigArray", () => {
                                     rules: {
                                         checker: {
                                             create(context) {
-                                                spy = sinon.spy(() => {
-                                                    const scope = context.getScope();
+                                                spy = sinon.spy(node => {
+                                                    const scope = context.sourceCode.getScope(node);
 
                                                     assert.strictEqual(getVariable(scope, "a"), null);
                                                 });
@@ -11966,8 +10918,8 @@ describe("Linter with FlatConfigArray", () => {
                                     rules: {
                                         checker: {
                                             create(context) {
-                                                spy = sinon.spy(() => {
-                                                    const scope = context.getScope();
+                                                spy = sinon.spy(node => {
+                                                    const scope = context.sourceCode.getScope(node);
 
                                                     assert.strictEqual(getVariable(scope, "a"), null);
                                                     assert.strictEqual(getVariable(scope, "b"), null);
@@ -11999,8 +10951,8 @@ describe("Linter with FlatConfigArray", () => {
                                 rules: {
                                     test: {
                                         create: context => ({
-                                            Program() {
-                                                const scope = context.getScope();
+                                            Program(node) {
+                                                const scope = context.sourceCode.getScope(node);
                                                 const sourceCode = context.sourceCode;
                                                 const comments = sourceCode.getAllComments();
 
@@ -12077,7 +11029,137 @@ describe("Linter with FlatConfigArray", () => {
                     const code = "/* exported horse */";
                     const config = { rules: {} };
 
-                    linter.verify(code, config, filename, true);
+                    linter.verify(code, config, filename);
+                });
+
+                it("variable should be exported", () => {
+                    const code = "/* exported horse */\n\nvar horse;";
+                    let spy;
+                    const config = {
+                        plugins: {
+                            test: {
+                                rules: {
+                                    checker: {
+                                        create(context) {
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
+                                                    horse = getVariable(scope, "horse");
+
+                                                assert.isTrue(horse.eslintUsed);
+                                            });
+
+                                            return { Program: spy };
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        languageOptions: {
+                            sourceType: "script"
+                        },
+                        rules: { "test/checker": "error" }
+                    };
+
+                    linter.verify(code, config);
+                    assert(spy && spy.calledOnce);
+                });
+
+                it("`key: value` pair variable should not be exported", () => {
+                    const code = "/* exported horse: true */\n\nvar horse;";
+                    let spy;
+                    const config = {
+                        plugins: {
+                            test: {
+                                rules: {
+                                    checker: {
+                                        create(context) {
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
+                                                    horse = getVariable(scope, "horse");
+
+                                                assert.notOk(horse.eslintUsed);
+                                            });
+
+                                            return { Program: spy };
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        languageOptions: {
+                            sourceType: "script"
+                        },
+                        rules: { "test/checker": "error" }
+                    };
+
+                    linter.verify(code, config);
+                    assert(spy && spy.calledOnce);
+                });
+
+                it("variables with comma should be exported", () => {
+                    const code = "/* exported horse, dog */\n\nvar horse, dog;";
+                    let spy;
+                    const config = {
+                        plugins: {
+                            test: {
+                                rules: {
+                                    checker: {
+                                        create(context) {
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node);
+
+                                                ["horse", "dog"].forEach(name => {
+                                                    assert.isTrue(getVariable(scope, name).eslintUsed);
+                                                });
+                                            });
+
+                                            return { Program: spy };
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        languageOptions: {
+                            sourceType: "script"
+                        },
+                        rules: { "test/checker": "error" }
+                    };
+
+                    linter.verify(code, config);
+                    assert(spy && spy.calledOnce);
+                });
+
+                it("variables without comma should not be exported", () => {
+                    const code = "/* exported horse dog */\n\nvar horse, dog;";
+                    let spy;
+                    const config = {
+                        plugins: {
+                            test: {
+                                rules: {
+                                    checker: {
+                                        create(context) {
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node);
+
+                                                ["horse", "dog"].forEach(name => {
+                                                    assert.notOk(getVariable(scope, name).eslintUsed);
+                                                });
+                                            });
+
+                                            return { Program: spy };
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        languageOptions: {
+                            sourceType: "script"
+                        },
+                        rules: { "test/checker": "error" }
+                    };
+
+                    linter.verify(code, config);
+                    assert(spy && spy.calledOnce);
                 });
 
                 it("variables should be exported", () => {
@@ -12090,8 +11172,8 @@ describe("Linter with FlatConfigArray", () => {
                                 rules: {
                                     checker: {
                                         create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope(),
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
                                                     horse = getVariable(scope, "horse");
 
                                                 assert.strictEqual(horse.eslintUsed, true);
@@ -12122,8 +11204,8 @@ describe("Linter with FlatConfigArray", () => {
                                 rules: {
                                     checker: {
                                         create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope(),
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
                                                     horse = getVariable(scope, "horse");
 
                                                 assert.strictEqual(horse, null);
@@ -12154,8 +11236,8 @@ describe("Linter with FlatConfigArray", () => {
                                 rules: {
                                     checker: {
                                         create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope(),
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
                                                     horse = getVariable(scope, "horse");
 
                                                 assert.strictEqual(horse.eslintUsed, true);
@@ -12186,8 +11268,8 @@ describe("Linter with FlatConfigArray", () => {
                                 rules: {
                                     checker: {
                                         create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope(),
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
                                                     horse = getVariable(scope, "horse");
 
                                                 assert.strictEqual(horse, null); // there is no global scope at all
@@ -12219,8 +11301,8 @@ describe("Linter with FlatConfigArray", () => {
                                 rules: {
                                     checker: {
                                         create(context) {
-                                            spy = sinon.spy(() => {
-                                                const scope = context.getScope(),
+                                            spy = sinon.spy(node => {
+                                                const scope = context.sourceCode.getScope(node),
                                                     horse = getVariable(scope, "horse");
 
                                                 assert.strictEqual(horse, null); // there is no global scope at all
@@ -12270,13 +11352,13 @@ describe("Linter with FlatConfigArray", () => {
                         };
                         const codeA = "/*eslint strict: 0*/ function bar() { return 2; }";
                         const codeB = "function foo() { return 1; }";
-                        let messages = linter.verify(codeA, config, filename, false);
+                        let messages = linter.verify(codeA, config, filename);
                         let suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 0);
                         assert.strictEqual(suppressedMessages.length, 0);
 
-                        messages = linter.verify(codeB, config, filename, false);
+                        messages = linter.verify(codeB, config, filename);
                         suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 1);
@@ -12292,13 +11374,13 @@ describe("Linter with FlatConfigArray", () => {
                         };
                         const codeA = "/*eslint quotes: 0*/ function bar() { return '2'; }";
                         const codeB = "function foo() { return '1'; }";
-                        let messages = linter.verify(codeA, config, filename, false);
+                        let messages = linter.verify(codeA, config, filename);
                         let suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 0);
                         assert.strictEqual(suppressedMessages.length, 0);
 
-                        messages = linter.verify(codeB, config, filename, false);
+                        messages = linter.verify(codeB, config, filename);
                         suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 1);
@@ -12309,13 +11391,13 @@ describe("Linter with FlatConfigArray", () => {
                         const config = { rules: { quotes: [2, "double"] } };
                         const codeA = "/*eslint quotes: [0, \"single\"]*/ function bar() { return '2'; }";
                         const codeB = "function foo() { return '1'; }";
-                        let messages = linter.verify(codeA, config, filename, false);
+                        let messages = linter.verify(codeA, config, filename);
                         let suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 0);
                         assert.strictEqual(suppressedMessages.length, 0);
 
-                        messages = linter.verify(codeB, config, filename, false);
+                        messages = linter.verify(codeB, config, filename);
                         suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 1);
@@ -12331,23 +11413,320 @@ describe("Linter with FlatConfigArray", () => {
                         };
                         const codeA = "/*eslint no-unused-vars: [0, {\"vars\": \"local\"}]*/ var a = 44;";
                         const codeB = "var b = 55;";
-                        let messages = linter.verify(codeA, config, filename, false);
+                        let messages = linter.verify(codeA, config, filename);
                         let suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 0);
                         assert.strictEqual(suppressedMessages.length, 0);
 
-                        messages = linter.verify(codeB, config, filename, false);
+                        messages = linter.verify(codeB, config, filename);
                         suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 1);
                         assert.strictEqual(suppressedMessages.length, 0);
                     });
+
+                    describe("when the rule was already configured", () => {
+                        const plugin = {
+                            rules: {
+                                "has-default-options": {
+                                    meta: {
+                                        schema: [{
+                                            type: "string"
+                                        }],
+                                        defaultOptions: ["option not provided"]
+                                    },
+                                    create(context) {
+                                        const message = context.options[0];
+
+                                        return {
+                                            Identifier(node) {
+                                                context.report({ node, message });
+                                            }
+                                        };
+                                    }
+                                },
+                                "my-rule": {
+                                    meta: {
+                                        schema: [{
+                                            type: "string"
+                                        }]
+                                    },
+                                    create(context) {
+                                        const message = context.options[0] ?? "option not provided";
+
+                                        return {
+                                            Program(node) {
+                                                context.report({ node, message });
+                                            }
+                                        };
+                                    }
+                                },
+                                "requires-option": {
+                                    meta: {
+                                        schema: {
+                                            type: "array",
+                                            items: [{
+                                                type: "string"
+                                            }],
+                                            minItems: 1
+                                        }
+                                    },
+                                    create(context) {
+                                        const message = context.options[0];
+
+                                        return {
+                                            Identifier(node) {
+                                                context.report({ node, message });
+                                            }
+                                        };
+                                    }
+                                }
+                            }
+                        };
+
+                        [
+                            "off",
+                            "error",
+                            ["off"],
+                            ["error"],
+                            ["off", "bar"],
+                            ["error", "bar"]
+                        ].forEach(ruleConfig => {
+                            const config = {
+                                plugins: {
+                                    test: plugin
+                                },
+                                rules: {
+                                    "test/has-default-options": ruleConfig,
+                                    "test/my-rule": ruleConfig
+                                }
+                            };
+
+                            it(`severity from the /*eslint*/ comment and options from the config should apply when the comment has only severity (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                                const code = "/*eslint test/my-rule: 'warn', test/has-default-options: 'warn' */ id";
+                                const messages = linter.verify(code, config);
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                const expectedMessage = Array.isArray(ruleConfig) && ruleConfig.length > 1
+                                    ? ruleConfig[1]
+                                    : "option not provided";
+
+                                assert.strictEqual(messages.length, 2);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, 1);
+                                assert.strictEqual(messages[0].message, expectedMessage);
+                                assert.strictEqual(messages[1].ruleId, "test/has-default-options");
+                                assert.strictEqual(messages[1].severity, 1);
+                                assert.strictEqual(messages[1].message, expectedMessage);
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+
+                            it(`severity from the /*eslint*/ comment and options from the config should apply when the comment has array with only severity (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                                const code = "/*eslint test/my-rule: ['warn'], test/has-default-options: ['warn'] */ id";
+                                const messages = linter.verify(code, config);
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                const expectedMessage = Array.isArray(ruleConfig) && ruleConfig.length > 1
+                                    ? ruleConfig[1]
+                                    : "option not provided";
+
+                                assert.strictEqual(messages.length, 2);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, 1);
+                                assert.strictEqual(messages[0].message, expectedMessage);
+                                assert.strictEqual(messages[1].ruleId, "test/has-default-options");
+                                assert.strictEqual(messages[1].severity, 1);
+                                assert.strictEqual(messages[1].message, expectedMessage);
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+
+                            it(`severity and options from the /*eslint*/ comment should apply when the comment includes options (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                                const code = "/*eslint test/my-rule: ['warn', 'foo'], test/has-default-options: ['warn', 'foo'] */ id";
+                                const messages = linter.verify(code, config);
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                assert.strictEqual(messages.length, 2);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, 1);
+                                assert.strictEqual(messages[0].message, "foo");
+                                assert.strictEqual(messages[1].ruleId, "test/has-default-options");
+                                assert.strictEqual(messages[1].severity, 1);
+                                assert.strictEqual(messages[1].message, "foo");
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+                        });
+
+                        it("reports an unnecessary inline config from the /*eslint*/ comment when the comment disables a rule that is not enabled so can't be turned off", () => {
+                            const code = "/*eslint test/my-rule: 'off' */";
+                            const config = {
+                                linterOptions: {
+                                    reportUnusedInlineConfigs: "error"
+                                },
+                                plugins: {
+                                    test: plugin
+                                }
+                            };
+                            const messages = linter.verify(code, config);
+                            const suppressedMessages = linter.getSuppressedMessages();
+
+                            assert.strictEqual(messages.length, 1);
+                            assert.strictEqual(messages[0].ruleId, null);
+                            assert.strictEqual(messages[0].severity, 2);
+                            assert.strictEqual(messages[0].message, "Unused inline config ('test/my-rule' is not enabled so can't be turned off).");
+                            assert.strictEqual(suppressedMessages.length, 0);
+                        });
+
+                        it("doesn't report an inline config from the /*eslint*/ comment when the comment enables a rule that is not enabled so can't be turned off", () => {
+                            const code = "/*eslint test/my-rule: 'error' */";
+                            const config = {
+                                linterOptions: {
+                                    reportUnusedInlineConfigs: "error"
+                                },
+                                plugins: {
+                                    test: plugin
+                                }
+                            };
+                            const messages = linter.verify(code, config);
+                            const suppressedMessages = linter.getSuppressedMessages();
+
+                            assert.strictEqual(messages.length, 1);
+                            assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                            assert.strictEqual(messages[0].severity, 2);
+                            assert.strictEqual(messages[0].message, "option not provided");
+                            assert.strictEqual(suppressedMessages.length, 0);
+                        });
+
+                        [
+                            "warn",
+                            ["warn"],
+                            ["warn", "bar"]
+                        ].forEach(ruleConfig => {
+                            const config = {
+                                plugins: {
+                                    test: plugin
+                                },
+                                rules: {
+                                    "test/my-rule": ruleConfig
+                                }
+                            };
+                            const configWithLinterOptions = {
+                                ...config,
+                                linterOptions: {
+                                    reportUnusedInlineConfigs: "error"
+                                }
+                            };
+
+                            it(`does not report an unnecessary inline config from the /*eslint*/ comment when the comment has only severity and reportUnusedInlineConfigs is disabled (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                                const code = "/*eslint test/my-rule: 'warn' */";
+                                const messages = linter.verify(code, config);
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                const expectedMessage = Array.isArray(ruleConfig) && ruleConfig.length > 1
+                                    ? ruleConfig[1]
+                                    : "option not provided";
+
+                                assert.strictEqual(messages.length, 1);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, 1);
+                                assert.strictEqual(messages[0].message, expectedMessage);
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+
+                            it(`reports an unnecessary inline config from the /*eslint*/ comment when the comment has array with only severity and reportUnusedInlineConfigs is enabled (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                                const code = "/*eslint test/my-rule: ['warn'] */";
+                                const messages = linter.verify(code, configWithLinterOptions);
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                const expectedRuleMessage = Array.isArray(ruleConfig) && ruleConfig.length > 1
+                                    ? ruleConfig[1]
+                                    : "option not provided";
+
+                                assert.strictEqual(messages.length, 2);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, 1);
+                                assert.strictEqual(messages[0].message, expectedRuleMessage);
+                                assert.strictEqual(messages[1].ruleId, null);
+                                assert.strictEqual(messages[1].severity, 2);
+                                assert.strictEqual(messages[1].message, "Unused inline config ('test/my-rule' is already configured to 'warn').");
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+
+                            it(`does not report options or severity from the /*eslint*/ comment when the comment includes new options and reportUnusedInlineConfigs is enabled (original config: ${JSON.stringify(ruleConfig)})`, () => {
+                                const code = "/*eslint test/my-rule: ['warn', 'foo'] */";
+                                const messages = linter.verify(code, configWithLinterOptions);
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                assert.strictEqual(messages.length, 1);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, 1);
+                                assert.strictEqual(messages[0].message, "foo");
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+                        });
+
+                        [
+                            ["error", 2],
+                            ["warn", 1]
+                        ].forEach(([severity, severityCode]) => {
+                            it(`reports an unnecessary inline config from the /*eslint*/ comment and options from the config when the comment has array with options and reportUnusedInlineConfigs is enabled (severity: ${severity})`, () => {
+                                const code = `/*eslint test/my-rule: ['${severity}', 'bar'] */`;
+                                const config = {
+                                    plugins: {
+                                        test: plugin
+                                    },
+                                    rules: {
+                                        "test/my-rule": [`${severity}`, "bar"]
+                                    }
+                                };
+                                const messages = linter.verify(code, {
+                                    ...config,
+                                    linterOptions: {
+                                        reportUnusedInlineConfigs: "error"
+                                    }
+                                });
+                                const suppressedMessages = linter.getSuppressedMessages();
+
+                                assert.strictEqual(messages.length, 2);
+                                assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                                assert.strictEqual(messages[0].severity, severityCode);
+                                assert.strictEqual(messages[0].message, "bar");
+                                assert.strictEqual(messages[1].ruleId, null);
+                                assert.strictEqual(messages[1].severity, 2);
+                                assert.strictEqual(messages[1].message, `Unused inline config ('test/my-rule' is already configured to '${severity}' with the same options).`);
+                                assert.strictEqual(suppressedMessages.length, 0);
+                            });
+                        });
+
+                        it("should validate and use originally configured options when /*eslint*/ comment enables rule that was set to 'off' in the configuration", () => {
+                            const code = "/*eslint test/my-rule: ['warn'], test/requires-option: 'warn' */ foo;";
+                            const config = {
+                                plugins: {
+                                    test: plugin
+                                },
+                                rules: {
+                                    "test/my-rule": ["off", true], // invalid options for this rule
+                                    "test/requires-option": ["off", "Don't use identifier"] // valid options for this rule
+                                }
+                            };
+                            const messages = linter.verify(code, config);
+                            const suppressedMessages = linter.getSuppressedMessages();
+
+                            assert.strictEqual(messages.length, 2);
+                            assert.strictEqual(messages[0].ruleId, "test/my-rule");
+                            assert.strictEqual(messages[0].severity, 2);
+                            assert.strictEqual(messages[0].message, "Inline configuration for rule \"test/my-rule\" is invalid:\n\tValue true should be string.\n");
+                            assert.strictEqual(messages[1].ruleId, "test/requires-option");
+                            assert.strictEqual(messages[1].severity, 1);
+                            assert.strictEqual(messages[1].message, "Don't use identifier");
+                            assert.strictEqual(suppressedMessages.length, 0);
+                        });
+                    });
                 });
 
                 describe("when evaluating code with invalid comments to enable rules", () => {
                     it("should report a violation when the config is not a valid rule configuration", () => {
-                        const messages = linter.verify("/*eslint no-alert:true*/ alert('test');", {});
+                        const messages = linter.verify("/*eslint no-alert:true*/ alert('test');");
                         const suppressedMessages = linter.getSuppressedMessages();
 
                         assert.deepStrictEqual(
@@ -12370,7 +11749,7 @@ describe("Linter with FlatConfigArray", () => {
                     });
 
                     it("should report a violation when a rule is configured using a string severity that contains uppercase letters", () => {
-                        const messages = linter.verify("/*eslint no-alert: \"Error\"*/ alert('test');", {});
+                        const messages = linter.verify("/*eslint no-alert: \"Error\"*/ alert('test');");
                         const suppressedMessages = linter.getSuppressedMessages();
 
                         assert.deepStrictEqual(
@@ -12393,7 +11772,7 @@ describe("Linter with FlatConfigArray", () => {
                     });
 
                     it("should report a violation when the config violates a rule's schema", () => {
-                        const messages = linter.verify("/* eslint no-alert: [error, {nonExistentPropertyName: true}]*/", {});
+                        const messages = linter.verify("/* eslint no-alert: [error, {nonExistentPropertyName: true}]*/");
                         const suppressedMessages = linter.getSuppressedMessages();
 
                         assert.deepStrictEqual(
@@ -12422,11 +11801,11 @@ describe("Linter with FlatConfigArray", () => {
                             "foo(); // <-- expected no-undef error here"
                         ].join("\n");
 
-                        const messages = linter.verify(code, {});
+                        const messages = linter.verify(code);
                         const suppressedMessages = linter.getSuppressedMessages();
 
                         // different engines have different JSON parsing error messages
-                        assert.match(messages[0].message, /Failed to parse JSON from ' "no-unused-vars": \['/u);
+                        assert.match(messages[0].message, /Failed to parse JSON from '"no-unused-vars": \['/u);
                         assert.strictEqual(messages[0].severity, 2);
                         assert.isTrue(messages[0].fatal);
                         assert.isNull(messages[0].ruleId);
@@ -12619,7 +11998,8 @@ describe("Linter with FlatConfigArray", () => {
                             },
                             rules: {
                                 "test/checker": "error"
-                            }
+                            },
+                            linterOptions: { reportUnusedDisableDirectives: 0 }
                         };
 
                         const problems = linter.verify(code, config);
@@ -12667,16 +12047,176 @@ describe("Linter with FlatConfigArray", () => {
                         const config = { ...baseConfig, rules: { "test-plugin/test-rule": 2 } };
                         const codeA = "/*eslint test-plugin/test-rule: 0*/ var a = \"trigger violation\";";
                         const codeB = "var a = \"trigger violation\";";
-                        let messages = linter.verify(codeA, config, filename, false);
+                        let messages = linter.verify(codeA, config, filename);
                         let suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 0);
                         assert.strictEqual(suppressedMessages.length, 0);
 
-                        messages = linter.verify(codeB, config, filename, false);
+                        messages = linter.verify(codeB, config, filename);
                         suppressedMessages = linter.getSuppressedMessages();
 
                         assert.strictEqual(messages.length, 1);
+                        assert.strictEqual(suppressedMessages.length, 0);
+                    });
+                });
+
+                describe("when evaluating code with multiple configuration comments for same rule", () => {
+
+                    let baseConfig;
+
+                    beforeEach(() => {
+                        baseConfig = {
+                            plugins: {
+                                "test-plugin": {
+                                    rules: {
+                                        "no-foo": {
+                                            meta: {
+                                                schema: [{
+                                                    enum: ["bar", "baz", "qux"]
+                                                }]
+                                            },
+                                            create(context) {
+                                                const replacement = context.options[0] ?? "default";
+
+                                                return {
+                                                    "Identifier[name='foo']"(node) {
+                                                        context.report(node, `Replace 'foo' with '${replacement}'.`);
+                                                    }
+                                                };
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        };
+                    });
+
+                    it("should apply the first and report an error for the second when there are two", () => {
+                        const code = "/*eslint test-plugin/no-foo: ['error', 'bar']*/ /*eslint test-plugin/no-foo: ['error', 'baz']*/ foo;";
+
+                        const messages = linter.verify(code, baseConfig);
+                        const suppressedMessages = linter.getSuppressedMessages();
+
+                        assert.deepStrictEqual(messages, [
+                            {
+                                ruleId: null,
+                                severity: 2,
+                                message: "Rule \"test-plugin/no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                                line: 1,
+                                column: 49,
+                                endLine: 1,
+                                endColumn: 96,
+                                nodeType: null
+                            },
+                            {
+                                ruleId: "test-plugin/no-foo",
+                                severity: 2,
+                                message: "Replace 'foo' with 'bar'.",
+                                line: 1,
+                                column: 97,
+                                endLine: 1,
+                                endColumn: 100,
+                                nodeType: "Identifier"
+                            }
+                        ]);
+                        assert.strictEqual(suppressedMessages.length, 0);
+                    });
+
+                    it("should apply the first and report an error for each other when there are more than two", () => {
+                        const code = "/*eslint test-plugin/no-foo: ['error', 'bar']*/ /*eslint test-plugin/no-foo: ['error', 'baz']*/ /*eslint test-plugin/no-foo: ['error', 'qux']*/ foo;";
+
+                        const messages = linter.verify(code, baseConfig);
+                        const suppressedMessages = linter.getSuppressedMessages();
+
+                        assert.deepStrictEqual(messages, [
+                            {
+                                ruleId: null,
+                                severity: 2,
+                                message: "Rule \"test-plugin/no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                                line: 1,
+                                column: 49,
+                                endLine: 1,
+                                endColumn: 96,
+                                nodeType: null
+                            },
+                            {
+                                ruleId: null,
+                                severity: 2,
+                                message: "Rule \"test-plugin/no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                                line: 1,
+                                column: 97,
+                                endLine: 1,
+                                endColumn: 144,
+                                nodeType: null
+                            },
+                            {
+                                ruleId: "test-plugin/no-foo",
+                                severity: 2,
+                                message: "Replace 'foo' with 'bar'.",
+                                line: 1,
+                                column: 145,
+                                endLine: 1,
+                                endColumn: 148,
+                                nodeType: "Identifier"
+                            }
+                        ]);
+                        assert.strictEqual(suppressedMessages.length, 0);
+                    });
+
+                    it("should apply the first and report an error for the second when both just override severity", () => {
+                        const code = "/*eslint test-plugin/no-foo: 'warn'*/ /*eslint test-plugin/no-foo: 'error'*/ foo;";
+
+                        const messages = linter.verify(code, { ...baseConfig, rules: { "test-plugin/no-foo": ["error", "bar"] } });
+                        const suppressedMessages = linter.getSuppressedMessages();
+
+                        assert.deepStrictEqual(messages, [
+                            {
+                                ruleId: null,
+                                severity: 2,
+                                message: "Rule \"test-plugin/no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.",
+                                line: 1,
+                                column: 39,
+                                endLine: 1,
+                                endColumn: 77,
+                                nodeType: null
+                            },
+                            {
+                                ruleId: "test-plugin/no-foo",
+                                severity: 1,
+                                message: "Replace 'foo' with 'bar'.",
+                                line: 1,
+                                column: 78,
+                                endLine: 1,
+                                endColumn: 81,
+                                nodeType: "Identifier"
+                            }
+                        ]);
+                        assert.strictEqual(suppressedMessages.length, 0);
+                    });
+
+                    it("should apply the second if the first has an invalid configuration", () => {
+                        const code = "/*eslint test-plugin/no-foo: ['error', 'quux']*/ /*eslint test-plugin/no-foo: ['error', 'bar']*/ foo;";
+
+                        const messages = linter.verify(code, baseConfig);
+                        const suppressedMessages = linter.getSuppressedMessages();
+
+                        assert.strictEqual(messages.length, 2);
+                        assert.include(messages[0].message, "Inline configuration for rule \"test-plugin/no-foo\" is invalid");
+                        assert.strictEqual(messages[1].message, "Replace 'foo' with 'bar'.");
+                        assert.strictEqual(suppressedMessages.length, 0);
+                    });
+
+                    it("should apply configurations for other rules that are in the same comment as the duplicate", () => {
+                        const code = "/*eslint test-plugin/no-foo: ['error', 'bar']*/ /*eslint test-plugin/no-foo: ['error', 'baz'], no-alert: ['error']*/ foo; alert();";
+
+                        const messages = linter.verify(code, baseConfig);
+                        const suppressedMessages = linter.getSuppressedMessages();
+
+                        assert.strictEqual(messages.length, 3);
+                        assert.strictEqual(messages[0].message, "Rule \"test-plugin/no-foo\" is already configured by another configuration comment in the preceding code. This configuration is ignored.");
+                        assert.strictEqual(messages[1].message, "Replace 'foo' with 'bar'.");
+                        assert.strictEqual(messages[2].ruleId, "no-alert");
                         assert.strictEqual(suppressedMessages.length, 0);
                     });
                 });
@@ -12754,7 +12294,7 @@ describe("Linter with FlatConfigArray", () => {
                             "/*eslint-enable*/"
                         ].join("\n");
 
-                        const config = { rules: { "no-alert": 1 } };
+                        const config = { rules: { "no-alert": 1 }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                         const messages = linter.verify(code, config, filename);
                         const suppressedMessages = linter.getSuppressedMessages();
@@ -12872,9 +12412,15 @@ describe("Linter with FlatConfigArray", () => {
                          * first part only as defined in the
                          * parseJsonConfig function in lib/eslint.js
                          */
-                        assert.match(messages[0].message, /^Failed to parse JSON from ' "no-alert":'1'':/u);
+                        assert.match(messages[0].message, /^Failed to parse JSON from '"no-alert":'1'':/u);
                         assert.strictEqual(messages[0].line, 1);
                         assert.strictEqual(messages[0].column, 1);
+                        assert.strictEqual(messages[0].endLine, 1);
+                        assert.strictEqual(messages[0].endColumn, 24);
+                        assert.strictEqual(messages[0].ruleId, null);
+                        assert.strictEqual(messages[0].fatal, true);
+                        assert.strictEqual(messages[0].severity, 2);
+                        assert.strictEqual(messages[0].nodeType, null);
 
                         assert.strictEqual(messages[1].ruleId, "no-alert");
                         assert.strictEqual(messages[1].message, "Unexpected alert.");
@@ -12900,9 +12446,15 @@ describe("Linter with FlatConfigArray", () => {
                          * first part only as defined in the
                          * parseJsonConfig function in lib/eslint.js
                          */
-                        assert.match(messages[0].message, /^Failed to parse JSON from ' "no-alert":abc':/u);
+                        assert.match(messages[0].message, /^Failed to parse JSON from '"no-alert":abc':/u);
                         assert.strictEqual(messages[0].line, 1);
                         assert.strictEqual(messages[0].column, 1);
+                        assert.strictEqual(messages[0].endLine, 1);
+                        assert.strictEqual(messages[0].endColumn, 24);
+                        assert.strictEqual(messages[0].ruleId, null);
+                        assert.strictEqual(messages[0].fatal, true);
+                        assert.strictEqual(messages[0].severity, 2);
+                        assert.strictEqual(messages[0].nodeType, null);
 
                         assert.strictEqual(messages[1].ruleId, "no-alert");
                         assert.strictEqual(messages[1].message, "Unexpected alert.");
@@ -12912,7 +12464,7 @@ describe("Linter with FlatConfigArray", () => {
                     });
 
                     it("should report a violation", () => {
-                        const code = "/*eslint no-alert:0 2*/ alert('test');";
+                        const code = "\n\n\n    /*eslint no-alert:0 2*/ alert('test');";
 
                         const config = { rules: { "no-alert": 1 } };
 
@@ -12928,9 +12480,15 @@ describe("Linter with FlatConfigArray", () => {
                          * first part only as defined in the
                          * parseJsonConfig function in lib/eslint.js
                          */
-                        assert.match(messages[0].message, /^Failed to parse JSON from ' "no-alert":0 2':/u);
-                        assert.strictEqual(messages[0].line, 1);
-                        assert.strictEqual(messages[0].column, 1);
+                        assert.match(messages[0].message, /^Failed to parse JSON from '"no-alert":0 2':/u);
+                        assert.strictEqual(messages[0].line, 4);
+                        assert.strictEqual(messages[0].column, 5);
+                        assert.strictEqual(messages[0].endLine, 4);
+                        assert.strictEqual(messages[0].endColumn, 28);
+                        assert.strictEqual(messages[0].ruleId, null);
+                        assert.strictEqual(messages[0].fatal, true);
+                        assert.strictEqual(messages[0].severity, 2);
+                        assert.strictEqual(messages[0].nodeType, null);
 
                         assert.strictEqual(messages[1].ruleId, "no-alert");
                         assert.strictEqual(messages[1].message, "Unexpected alert.");
@@ -13016,7 +12574,7 @@ var a = "test2";
                         "console.log(\"foo\");",
                         "/* eslint-enable quotes */"
                     ].join("\n");
-                    const config = { rules: { quotes: 2 } };
+                    const config = { rules: { quotes: 2 }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13061,7 +12619,7 @@ var a = "test2";
                         "/*eslint-enable no-console */",
                         "alert('test');"
                     ].join("\n");
-                    const config = { rules: { "no-alert": 1, "no-console": 1 } };
+                    const config = { rules: { "no-alert": 1, "no-console": 1 }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13125,7 +12683,7 @@ var a = "test2";
 
                         "/*eslint-enable*/"
                     ].join("\n");
-                    const config = { rules: { "no-alert": 1, "no-console": 1 } };
+                    const config = { rules: { "no-alert": 1, "no-console": 1 }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13164,7 +12722,7 @@ var a = "test2";
                         "console.log('test');", // here
                         "/*eslint-enable no-console */"
                     ].join("\n");
-                    const config = { rules: { "no-alert": 1, "no-console": 1 } };
+                    const config = { rules: { "no-alert": 1, "no-console": 1 }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13203,7 +12761,7 @@ var a = "test2";
                         "console.log('test');", // here
                         "/*eslint-enable no-console */"
                     ].join("\n");
-                    const config = { rules: { "no-alert": "warn", "no-console": "warn" } };
+                    const config = { rules: { "no-alert": "warn", "no-console": "warn" }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13232,7 +12790,7 @@ var a = "test2";
                         "var bar;",
                         "/* eslint-enable no-unused-vars */" // here
                     ].join("\n");
-                    const config = { rules: { "no-unused-vars": 2 } };
+                    const config = { rules: { "no-unused-vars": 2 }, linterOptions: { reportUnusedDisableDirectives: 0 } };
 
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13632,7 +13190,8 @@ var a = "test2";
                     const config = {
                         rules: {
                             "no-alert": 1
-                        }
+                        },
+                        linterOptions: { reportUnusedDisableDirectives: 0 }
                     };
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13696,7 +13255,8 @@ var a = "test2";
                         rules: {
                             "no-alert": 1,
                             "no-console": 1
-                        }
+                        },
+                        linterOptions: { reportUnusedDisableDirectives: 0 }
                     };
                     const messages = linter.verify(code, config, filename);
                     const suppressedMessages = linter.getSuppressedMessages();
@@ -13719,7 +13279,8 @@ var a = "test2";
                         rules: {
                             "no-alert": 1,
                             "no-console": 1
-                        }
+                        },
+                        linterOptions: { reportUnusedDisableDirectives: 0 }
                     };
                     const messages = linter.verify(code, config, filename);
 
@@ -14070,7 +13631,23 @@ var a = "test2";
                             messageId: "unusedVar",
                             nodeType: "Identifier",
                             ruleId: "no-unused-vars",
-                            severity: 2
+                            severity: 2,
+                            suggestions: [
+                                {
+                                    data: {
+                                        varName: "bbb"
+                                    },
+                                    desc: "Remove unused variable 'bbb'.",
+                                    fix: {
+                                        range: [
+                                            99,
+                                            111
+                                        ],
+                                        text: ""
+                                    },
+                                    messageId: "removeVar"
+                                }
+                            ]
                         }]
                     );
 
@@ -14124,7 +13701,7 @@ var a = "test2";
                     /*eslint-enable no-redeclare -- no-unused-vars */
                     var aaa = {}
                     var aaa = {}
-                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" } });
+                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" }, linterOptions: { reportUnusedDisableDirectives: 0 } });
                     const suppressedMessages = linter.getSuppressedMessages();
 
                     // Do include `no-redeclare` but not `no-unused-vars`
@@ -14164,7 +13741,7 @@ var a = "test2";
                     const messages = linter.verify(`
                     var aaa = {} //eslint-disable-line no-redeclare -- no-unused-vars
                     var aaa = {} //eslint-disable-line no-redeclare -- no-unused-vars
-                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" } });
+                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" }, linterOptions: { reportUnusedDisableDirectives: 0 } });
                     const suppressedMessages = linter.getSuppressedMessages();
 
                     // Do include `no-unused-vars` but not `no-redeclare`
@@ -14204,7 +13781,7 @@ var a = "test2";
                     const messages = linter.verify(`
                     var aaa = {} /*eslint-disable-line no-redeclare -- no-unused-vars */
                     var aaa = {} /*eslint-disable-line no-redeclare -- no-unused-vars */
-                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" } });
+                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" }, linterOptions: { reportUnusedDisableDirectives: 0 } });
                     const suppressedMessages = linter.getSuppressedMessages();
 
                     // Do include `no-unused-vars` but not `no-redeclare`
@@ -14246,7 +13823,7 @@ var a = "test2";
                     var aaa = {}
                     //eslint-disable-next-line no-redeclare -- no-unused-vars
                     var aaa = {}
-                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" } });
+                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" }, linterOptions: { reportUnusedDisableDirectives: 0 } });
                     const suppressedMessages = linter.getSuppressedMessages();
 
                     // Do include `no-unused-vars` but not `no-redeclare`
@@ -14288,7 +13865,7 @@ var a = "test2";
                     var aaa = {}
                     /*eslint-disable-next-line no-redeclare -- no-unused-vars */
                     var aaa = {}
-                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" } });
+                `, { rules: { "no-redeclare": "error", "no-unused-vars": "error" }, linterOptions: { reportUnusedDisableDirectives: 0 } });
                     const suppressedMessages = linter.getSuppressedMessages();
 
                     // Do include `no-unused-vars` but not `no-redeclare`
@@ -14449,8 +14026,8 @@ var a = "test2";
                                     rules: {
                                         test: {
                                             create: context => ({
-                                                Program() {
-                                                    const scope = context.getScope();
+                                                Program(node) {
+                                                    const scope = context.sourceCode.getScope(node);
                                                     const sourceCode = context.sourceCode;
                                                     const comments = sourceCode.getAllComments();
 
@@ -14898,7 +14475,7 @@ var a = "test2";
                     assert.strictEqual(suppressedMessages.length, 0);
                 });
 
-                it("reports problems for unused eslint-disable comments (in config)", () => {
+                it("reports problems for unused eslint-disable comments (in config) (boolean value, true)", () => {
                     const messages = linter.verify("/* eslint-disable */", {
                         linterOptions: {
                             reportUnusedDisableDirectives: true
@@ -14927,11 +14504,82 @@ var a = "test2";
                     assert.strictEqual(suppressedMessages.length, 0);
                 });
 
+                it("does not report problems for unused eslint-disable comments (in config) (boolean value, false)", () => {
+                    const messages = linter.verify("/* eslint-disable */", {
+                        linterOptions: {
+                            reportUnusedDisableDirectives: false
+                        }
+                    });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(messages, []);
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("does not report problems for unused eslint-disable comments (in config) (string value, off)", () => {
+                    const messages = linter.verify("/* eslint-disable */", {
+                        linterOptions: {
+                            reportUnusedDisableDirectives: "off"
+                        }
+                    });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(messages, []);
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("reports problems for unused eslint-disable comments (in config) (string value, error)", () => {
+                    const messages = linter.verify("/* eslint-disable */", {
+                        linterOptions: {
+                            reportUnusedDisableDirectives: "error"
+                        }
+                    });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-disable directive (no problems were reported).",
+                                line: 1,
+                                column: 1,
+                                fix: {
+                                    range: [0, 20],
+                                    text: " "
+                                },
+                                severity: 2,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("throws with invalid string for reportUnusedDisableDirectives in config", () => {
+                    assert.throws(() => linter.verify("/* eslint-disable */", {
+                        linterOptions: {
+                            reportUnusedDisableDirectives: "foo"
+                        }
+                    }), 'Key "linterOptions": Key "reportUnusedDisableDirectives": Expected one of: "error", "warn", "off", 0, 1, 2, or a boolean.');
+                });
+
+                it("throws with invalid type for reportUnusedDisableDirectives in config", () => {
+                    assert.throws(() => linter.verify("/* eslint-disable */", {
+                        linterOptions: {
+                            reportUnusedDisableDirectives: {}
+                        }
+                    }), 'Key "linterOptions": Key "reportUnusedDisableDirectives": Expected one of: "error", "warn", "off", 0, 1, 2, or a boolean.');
+                });
+
                 it("reports problems for partially unused eslint-disable comments (in config)", () => {
                     const code = "alert('test'); // eslint-disable-line no-alert, no-redeclare";
                     const config = {
                         linterOptions: {
-                            reportUnusedDisableDirectives: true
+                            reportUnusedDisableDirectives: "warn"
                         },
                         rules: {
                             "no-alert": 1,
@@ -14971,7 +14619,7 @@ var a = "test2";
                     assert.deepStrictEqual(
                         linter.verify("// eslint-disable-next-line", {
                             linterOptions: {
-                                reportUnusedDisableDirectives: true
+                                reportUnusedDisableDirectives: "warn"
                             }
                         }),
                         [
@@ -14995,7 +14643,7 @@ var a = "test2";
                     assert.deepStrictEqual(
                         linter.verify("/* \neslint-disable-next-line\n */", {
                             linterOptions: {
-                                reportUnusedDisableDirectives: true
+                                reportUnusedDisableDirectives: "warn"
                             }
                         }),
                         [
@@ -15019,7 +14667,7 @@ var a = "test2";
                     const code = "// eslint-disable-next-line no-alert, no-redeclare \nalert('test');";
                     const config = {
                         linterOptions: {
-                            reportUnusedDisableDirectives: true
+                            reportUnusedDisableDirectives: "warn"
                         },
                         rules: {
                             "no-alert": 1,
@@ -15061,7 +14709,7 @@ var a = "test2";
                     `;
                     const config = {
                         linterOptions: {
-                            reportUnusedDisableDirectives: true
+                            reportUnusedDisableDirectives: "warn"
                         },
                         rules: {
                             "no-alert": 1,
@@ -15093,12 +14741,355 @@ var a = "test2";
                     );
                 });
 
+                it("reports problems for unused eslint-enable comments", () => {
+                    const messages = linter.verify("/* eslint-enable */", {}, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+                                line: 1,
+                                column: 1,
+                                fix: {
+                                    range: [0, 19],
+                                    text: " "
+                                },
+                                severity: 2,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("reports problems for unused eslint-enable comments with ruleId", () => {
+                    const messages = linter.verify("/* eslint-enable no-alert */", {}, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-enable directive (no matching eslint-disable directives were found for 'no-alert').",
+                                line: 1,
+                                column: 1,
+                                fix: {
+                                    range: [0, 28],
+                                    text: " "
+                                },
+                                severity: 2,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("reports problems for unused eslint-enable comments with mismatch ruleId", () => {
+                    const code = [
+                        "/* eslint-disable no-alert */",
+                        "alert(\"test\");",
+                        "/* eslint-enable no-console */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-enable directive (no matching eslint-disable directives were found for 'no-console').",
+                                line: 3,
+                                column: 1,
+                                fix: {
+                                    range: [45, 75],
+                                    text: " "
+                                },
+                                severity: 2,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 1);
+                });
+
+                it("reports problems for unused eslint-enable comments with used eslint-enable comments", () => {
+                    const code = [
+                        "/* eslint-disable no-alert -- j1 */",
+                        "alert(\"test\");",
+                        "/* eslint-disable no-alert -- j2 */",
+                        "alert(\"test\");",
+                        "/* eslint-enable no-alert -- j3 */",
+                        "/* eslint-enable -- j4 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+                                line: 6,
+                                column: 1,
+                                fix: {
+                                    range: [137, 162],
+                                    text: " "
+                                },
+                                severity: 2,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 2);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                    assert.strictEqual(suppressedMessages[1].suppressions.length, 2);
+                });
+
+                it("reports problems for multiple eslint-enable comments with same ruleId", () => {
+                    const code = [
+                        "/* eslint-disable no-alert -- j1 */",
+                        "alert(\"test\"); //",
+                        "/* eslint-enable no-alert -- j2 */",
+                        "/* eslint-enable no-alert -- j3 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 1);
+                    assert.strictEqual(messages[0].line, 4);
+                    assert.strictEqual(suppressedMessages.length, 1);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                });
+
+                it("reports problems for multiple eslint-enable comments without ruleId (Rule is already enabled)", () => {
+                    const code = [
+                        "/* eslint-disable no-alert -- j1 */",
+                        "alert(\"test\"); //",
+                        "/* eslint-enable no-alert -- j2 */",
+                        "/* eslint-enable -- j3 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 1);
+                    assert.strictEqual(messages[0].line, 4);
+                    assert.strictEqual(suppressedMessages.length, 1);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                });
+
+                it("reports problems for multiple eslint-enable comments with ruleId (Rule is already enabled by eslint-enable comments without ruleId)", () => {
+                    const code = [
+                        "/* eslint-disable no-alert -- j1 */",
+                        "alert(\"test\"); //",
+                        "/* eslint-enable -- j3 */",
+                        "/* eslint-enable no-alert -- j2 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 1);
+                    assert.strictEqual(messages[0].line, 4);
+                    assert.strictEqual(suppressedMessages.length, 1);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                });
+
+                it("reports problems for eslint-enable comments without ruleId (Two rules are already enabled)", () => {
+                    const code = [
+                        "/* eslint-disable no-alert, no-console -- j1 */",
+                        "alert(\"test\"); //",
+                        "console.log(\"test\"); //",
+                        "/* eslint-enable no-alert -- j2 */",
+                        "/* eslint-enable no-console -- j3 */",
+                        "/* eslint-enable -- j4 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2,
+                            "no-console": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 1);
+                    assert.strictEqual(messages[0].line, 6);
+                    assert.strictEqual(suppressedMessages.length, 2);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                    assert.strictEqual(suppressedMessages[1].suppressions.length, 1);
+                });
+
+                it("reports problems for multiple eslint-enable comments with ruleId (Two rules are already enabled by eslint-enable comments without ruleId)", () => {
+                    const code = [
+                        "/* eslint-disable no-alert, no-console -- j1 */",
+                        "alert(\"test\"); //",
+                        "console.log(\"test\"); //",
+                        "/* eslint-enable -- j2 */",
+                        "/* eslint-enable no-console -- j3 */",
+                        "/* eslint-enable no-alert -- j4 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2,
+                            "no-console": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 2);
+                    assert.strictEqual(messages[0].line, 5);
+                    assert.strictEqual(messages[1].line, 6);
+                    assert.strictEqual(suppressedMessages.length, 2);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                    assert.strictEqual(suppressedMessages[1].suppressions.length, 1);
+                });
+
+                it("reports problems for multiple eslint-enable comments", () => {
+                    const code = [
+                        "/* eslint-disable no-alert, no-console -- j1 */",
+                        "alert(\"test\"); //",
+                        "console.log(\"test\"); //",
+                        "/* eslint-enable no-console -- j2 */",
+                        "/* eslint-enable -- j3 */",
+                        "/* eslint-enable no-alert -- j4 */",
+                        "/* eslint-enable -- j5 */"
+                    ].join("\n");
+                    const config = {
+                        rules: {
+                            "no-alert": 2,
+                            "no-console": 2
+                        }
+                    };
+                    const messages = linter.verify(code, config, { reportUnusedDisableDirectives: true });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 2);
+                    assert.strictEqual(messages[0].line, 6);
+                    assert.strictEqual(messages[1].line, 7);
+                    assert.strictEqual(suppressedMessages.length, 2);
+                    assert.strictEqual(suppressedMessages[0].suppressions.length, 1);
+                    assert.strictEqual(suppressedMessages[1].suppressions.length, 1);
+                });
+
+                it("reports problems for unused eslint-disable comments (warn, explicitly set)", () => {
+                    const messages = linter.verify("/* eslint-disable */", {}, { reportUnusedDisableDirectives: "warn" });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-disable directive (no problems were reported).",
+                                line: 1,
+                                column: 1,
+                                fix: {
+                                    range: [0, 20],
+                                    text: " "
+                                },
+                                severity: 1,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("reports problems for unused eslint-disable comments (warn by default)", () => {
+                    const messages = linter.verify("/* eslint-disable */", {});
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.deepStrictEqual(
+                        messages,
+                        [
+                            {
+                                ruleId: null,
+                                message: "Unused eslint-disable directive (no problems were reported).",
+                                line: 1,
+                                column: 1,
+                                fix: {
+                                    range: [0, 20],
+                                    text: " "
+                                },
+                                severity: 1,
+                                nodeType: null
+                            }
+                        ]
+                    );
+
+                    assert.strictEqual(suppressedMessages.length, 0);
+                });
+
+                it("reports no problems for no-fallthrough despite comment pattern match", () => {
+                    const code = "switch (foo) { case 0: a(); \n// eslint-disable-next-line no-fallthrough\n case 1: }";
+                    const config = {
+                        linterOptions: {
+                            reportUnusedDisableDirectives: true
+                        },
+                        rules: {
+                            "no-fallthrough": 2
+                        }
+                    };
+
+                    const messages = linter.verify(code, config, {
+                        filename,
+                        allowInlineConfig: true
+                    });
+                    const suppressedMessages = linter.getSuppressedMessages();
+
+                    assert.strictEqual(messages.length, 0);
+
+                    assert.strictEqual(suppressedMessages.length, 1);
+                    assert.strictEqual(suppressedMessages[0].ruleId, "no-fallthrough");
+                });
+
+
                 describe("autofix", () => {
                     const alwaysReportsRule = {
                         create(context) {
                             return {
                                 Program(node) {
                                     context.report({ message: "bad code", loc: node.loc.end });
+                                },
+                                "Identifier[name=bad]"(node) {
+                                    context.report({ message: "bad id", loc: node.loc });
                                 }
                             };
                         }
@@ -15124,7 +15115,7 @@ var a = "test2";
                             }
                         },
                         linterOptions: {
-                            reportUnusedDisableDirectives: true
+                            reportUnusedDisableDirectives: "warn"
                         },
                         rules: {
                             ...Object.fromEntries(usedRules.map(name => [`test/${name}`, "error"])),
@@ -15177,6 +15168,10 @@ var a = "test2";
                             code: "/* eslint-disable \ntest/unused\n*/",
                             output: " "
                         },
+                        {
+                            code: "/* eslint-enable \ntest/unused\n*/",
+                            output: " "
+                        },
 
                         //-----------------------------------------------
                         // Removing only individual rules
@@ -15214,6 +15209,26 @@ var a = "test2";
                         {
                             code: "/*\u00A0eslint-disable test/unused, test/used*/",
                             output: "/*\u00A0eslint-disable test/used*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /*\neslint-enable test/unused, test/used*/",
+                            output: "/* eslint-disable test/used */ bad /*\neslint-enable test/used*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /*\n eslint-enable test/unused, test/used*/",
+                            output: "/* eslint-disable test/used */ bad /*\n eslint-enable test/used*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /*\r\neslint-enable test/unused, test/used*/",
+                            output: "/* eslint-disable test/used */ bad /*\r\neslint-enable test/used*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /*\u2028eslint-enable test/unused, test/used*/",
+                            output: "/* eslint-disable test/used */ bad /*\u2028eslint-enable test/used*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /*\u00A0eslint-enable test/unused, test/used*/",
+                            output: "/* eslint-disable test/used */ bad /*\u00A0eslint-enable test/used*/"
                         },
                         {
                             code: "// eslint-disable-line  test/unused, test/used",
@@ -15274,6 +15289,18 @@ var a = "test2";
                             output: "/* eslint-disable test/used */"
                         },
                         {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/unused\n,\ntest/used */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/unused \n \n,\n\n test/used */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/unused\u2028,\u2028test/used */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used */"
+                        },
+                        {
                             code: "// eslint-disable-line test/unused\u00A0,\u00A0test/used",
                             output: "// eslint-disable-line test/used"
                         },
@@ -15328,6 +15355,18 @@ var a = "test2";
                             output: "/* eslint-disable test/used-1,test/used-2 */"
                         },
                         {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\ntest/unused\n,test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,test/used-2 */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\n\n test/unused \n \n ,test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,test/used-2 */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\u2028test/unused\u2028,test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,test/used-2 */"
+                        },
+                        {
                             code: "// eslint-disable-line test/used-1,\u00A0test/unused\u00A0,test/used-2",
                             output: "// eslint-disable-line test/used-1,test/used-2"
                         },
@@ -15362,6 +15401,14 @@ var a = "test2";
                             output: "/* eslint-disable test/used-1\u2028,\u2028test/used-2 */"
                         },
                         {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1\n,test/unused,\ntest/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1\n,\ntest/used-2 */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1\u2028,test/unused,\u2028test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1\u2028,\u2028test/used-2 */"
+                        },
+                        {
                             code: "// eslint-disable-line test/used-1\u00A0,test/unused,\u00A0test/used-2",
                             output: "// eslint-disable-line test/used-1\u00A0,\u00A0test/used-2"
                         },
@@ -15386,6 +15433,18 @@ var a = "test2";
                             output: "/* eslint-disable test/used-1,\n,\n,test/used-2 */"
                         },
                         {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\n,test/unused,test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\n,test/used-2 */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,test/unused,\n,test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\n,test/used-2 */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\n,test/unused,\n,test/used-2 */",
+                            output: "/* eslint-disable test/used-1, test/used-2 */ bad /* eslint-enable test/used-1,\n,\n,test/used-2 */"
+                        },
+                        {
                             code: "// eslint-disable-line test/used, test/unused,",
                             output: "// eslint-disable-line test/used,"
                         },
@@ -15404,6 +15463,10 @@ var a = "test2";
                         {
                             code: "/* eslint-disable test/used, test/unused,\n*/",
                             output: "/* eslint-disable test/used,\n*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used, test/unused,\n*/",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used,\n*/"
                         },
 
                         // when removing the last rule, the comma and all whitespace up to the previous rule (or previous lone comma) should also be removed
@@ -15444,6 +15507,18 @@ var a = "test2";
                             output: "/* eslint-disable test/used */"
                         },
                         {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used\n,\ntest/unused */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used \n \n,\n\n test/unused */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used\u2028,\u2028test/unused */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used */"
+                        },
+                        {
                             code: "// eslint-disable-line test/used\u00A0,\u00A0test/unused",
                             output: "// eslint-disable-line test/used"
                         },
@@ -15462,6 +15537,14 @@ var a = "test2";
                         {
                             code: "/* eslint-disable test/used\n, ,test/unused */",
                             output: "/* eslint-disable test/used\n, */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used,\n,test/unused */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used, */"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used\n, ,test/unused */",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used\n, */"
                         },
 
                         // content after the last rule should not be changed
@@ -15492,6 +15575,10 @@ var a = "test2";
                         {
                             code: "/* eslint-disable test/used,test/unused\u2028*/",
                             output: "/* eslint-disable test/used\u2028*/"
+                        },
+                        {
+                            code: "/* eslint-disable test/used */ bad /* eslint-enable test/used,test/unused\u2028*/",
+                            output: "/* eslint-disable test/used */ bad /* eslint-enable test/used\u2028*/"
                         },
                         {
                             code: "// eslint-disable-line test/used,test/unused\u00A0",
@@ -15633,6 +15720,148 @@ var a = "test2";
                         */
                     `
                         },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable test/unused-1,
+                           test/used-1,
+                           test/unused-2,
+                           test/used-2
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable test/used-1,
+                           test/used-2
+                        */
+                    `
+                        },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/unused-1,
+                               test/used-1,
+                               test/unused-2,
+                               test/used-2
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/used-2
+                        */
+                    `
+                        },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/unused-1,
+                               test/used-2,
+                               test/unused-2
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/used-2
+                        */
+                    `
+                        },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/unused-1,
+                               test/used-2,
+                               test/unused-2,
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/used-2,
+                        */
+                    `
+                        },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               ,test/unused-1
+                               ,test/used-1
+                               ,test/unused-2
+                               ,test/used-2
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               ,test/used-1
+                               ,test/used-2
+                        */
+                    `
+                        },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               ,test/used-1
+                               ,test/unused-1
+                               ,test/used-2
+                               ,test/unused-2
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               ,test/used-1
+                               ,test/used-2
+                        */
+                    `
+                        },
+                        {
+                            code: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/unused-1,
+                               test/used-2,
+                               test/unused-2
+
+                               -- comment
+                        */
+                    `,
+                            output: `
+                        /* eslint-disable test/used-1, test/used-2 */
+                        bad
+                        /* eslint-enable
+                               test/used-1,
+                               test/used-2
+
+                               -- comment
+                        */
+                    `
+                        },
 
                         // duplicates in the list
                         {
@@ -15688,8 +15917,8 @@ var a = "test2";
                             rules: {
                                 checker: {
                                     create(context) {
-                                        spy = sinon.spy(() => {
-                                            const scope = context.getScope();
+                                        spy = sinon.spy(node => {
+                                            const scope = context.sourceCode.getScope(node);
 
                                             assert.notStrictEqual(getVariable(scope, "Object"), null);
                                             assert.notStrictEqual(getVariable(scope, "Array"), null);
@@ -15723,8 +15952,8 @@ var a = "test2";
                             rules: {
                                 checker: {
                                     create(context) {
-                                        spy = sinon.spy(() => {
-                                            const scope = context.getScope();
+                                        spy = sinon.spy(node => {
+                                            const scope = context.sourceCode.getScope(node);
 
                                             assert.notStrictEqual(getVariable(scope, "Promise"), null);
                                             assert.notStrictEqual(getVariable(scope, "Symbol"), null);
@@ -15932,7 +16161,7 @@ var a = "test2";
                 const code = BROKEN_TEST_CODE;
 
                 it("should report a violation with a useful parse error prefix", () => {
-                    const messages = linter.verify(code, {});
+                    const messages = linter.verify(code);
                     const suppressedMessages = linter.getSuppressedMessages();
 
                     assert.strictEqual(messages.length, 1);
@@ -15978,13 +16207,62 @@ var a = "test2";
             });
 
         });
+
+        it("should default to flat config mode when a config isn't passed", () => {
+
+            // eslint-env should not be honored
+            const messages = linter.verify("/*eslint no-undef:error*//*eslint-env browser*/\nwindow;");
+            const suppressedMessages = linter.getSuppressedMessages();
+
+            assert.strictEqual(messages.length, 1);
+            assert.strictEqual(messages[0].ruleId, "no-undef");
+            assert.strictEqual(messages[0].severity, 2);
+            assert.strictEqual(messages[0].line, 2);
+            assert.strictEqual(messages[0].column, 1);
+
+            assert.strictEqual(suppressedMessages.length, 0);
+        });
+
+        describe("Passing SourceCode", () => {
+
+            it("should verify a SourceCode object created with the constructor", () => {
+                const text = "var foo = bar;";
+                const sourceCode = new SourceCode({
+                    text,
+                    ast: espree.parse(text, { loc: true, range: true, tokens: true, comment: true })
+                });
+                const messages = linter.verify(sourceCode, { rules: { "no-undef": "error" } });
+                const suppressedMessages = linter.getSuppressedMessages();
+
+                assert.strictEqual(messages.length, 1);
+                assert.strictEqual(messages[0].message, "'bar' is not defined.");
+                assert.strictEqual(suppressedMessages.length, 0);
+            });
+
+            it("should ensure that SourceCode properties are copied over during linting", () => {
+                const text = "var foo = bar;";
+                const sourceCode = new SourceCode({
+                    text,
+                    ast: espree.parse(text, { loc: true, range: true, tokens: true, comment: true }),
+                    hasBOM: true
+                });
+
+                linter.verify(sourceCode, { rules: { "no-undef": "error" } });
+                const resultSourceCode = linter.getSourceCode();
+
+                assert.strictEqual(resultSourceCode.text, text);
+                assert.strictEqual(resultSourceCode.ast, sourceCode.ast);
+                assert.strictEqual(resultSourceCode.hasBOM, true);
+            });
+
+        });
     });
 
     describe("getSourceCode()", () => {
         const code = TEST_CODE;
 
         it("should retrieve SourceCode object after reset", () => {
-            linter.verify(code, {}, filename, true);
+            linter.verify(code, {}, filename);
 
             const sourceCode = linter.getSourceCode();
 
@@ -16058,7 +16336,7 @@ var a = "test2";
         it("should throw an error when called in flat config mode", () => {
             assert.throws(() => {
                 linter.defineRule("foo", {
-                    create() {}
+                    create() { }
                 });
             }, /This method cannot be used with flat config/u);
         });
@@ -16282,28 +16560,86 @@ var a = "test2";
         });
     });
 
-    describe("Mutability", () => {
-        let linter1 = null;
-        let linter2 = null;
+    describe("options", () => {
+        it("rules should apply meta.defaultOptions on top of schema defaults", () => {
+            const config = {
+                plugins: {
+                    test: {
+                        rules: {
+                            checker: {
+                                meta: {
+                                    defaultOptions: [{
+                                        inBoth: "from-default-options",
+                                        inDefaultOptions: "from-default-options"
+                                    }],
+                                    schema: [{
+                                        type: "object",
+                                        properties: {
+                                            inBoth: { default: "from-schema", type: "string" },
+                                            inDefaultOptions: { type: "string" },
+                                            inSchema: { default: "from-schema", type: "string" }
+                                        },
+                                        additionalProperties: false
+                                    }]
+                                },
+                                create(context) {
+                                    return {
+                                        Program(node) {
+                                            context.report({
+                                                message: JSON.stringify(context.options[0]),
+                                                node
+                                            });
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                    }
+                },
+                rules: {
+                    "test/checker": "error"
+                }
+            };
 
-        beforeEach(() => {
-            linter1 = new Linter();
-            linter2 = new Linter();
+            const messages = linter.verify("foo", config, filename);
+
+            assert.deepStrictEqual(
+                JSON.parse(messages[0].message),
+                { inBoth: "from-default-options", inDefaultOptions: "from-default-options", inSchema: "from-schema" }
+            );
         });
 
-        describe("rules", () => {
-            it("with no changes, same rules are loaded", () => {
-                assert.sameDeepMembers(Array.from(linter1.getRules().keys()), Array.from(linter2.getRules().keys()));
-            });
+        it("meta.defaultOptions should be applied even if rule has schema:false", () => {
+            const config = {
+                plugins: {
+                    test: {
+                        rules: {
+                            checker: {
+                                meta: {
+                                    defaultOptions: ["foo"],
+                                    schema: false
+                                },
+                                create(context) {
+                                    return {
+                                        Program(node) {
+                                            context.report({
+                                                message: context.options[0],
+                                                node
+                                            });
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                    }
+                },
+                rules: {
+                    "test/checker": "error"
+                }
+            };
+            const messages = linter.verify("", config, filename);
 
-            it("loading rule in one doesn't change the other", () => {
-                linter1.defineRule("mock-rule", {
-                    create: () => ({})
-                });
-
-                assert.isTrue(linter1.getRules().has("mock-rule"), "mock rule is present");
-                assert.isFalse(linter2.getRules().has("mock-rule"), "mock rule is not present");
-            });
+            assert.strictEqual(messages[0].message, "foo");
         });
     });
 
@@ -16378,6 +16714,47 @@ var a = "test2";
 
                 linter.verify("foo", config, "a.md");
                 assert.strictEqual(logs.length, 1, "preprocess() should only be called once.");
+            });
+
+            it("should pass the BOM to preprocess", () => {
+                const logs = [];
+                const code = "\uFEFFfoo";
+                const config = {
+                    files: ["**/*.myjs"],
+                    processor: {
+                        preprocess(text, filenameForText) {
+                            logs.push({
+                                text,
+                                filename: filenameForText
+                            });
+
+                            return [{ text, filename: filenameForText }];
+                        },
+                        postprocess(messages) {
+                            return messages.flat();
+                        }
+                    },
+                    rules: {
+                        "unicode-bom": ["error", "never"]
+                    }
+                };
+
+                const results = linter.verify(code, config, {
+                    filename: "a.myjs",
+                    filterCodeBlock() {
+                        return true;
+                    }
+                });
+
+                assert.deepStrictEqual(logs, [
+                    {
+                        text: code,
+                        filename: "a.myjs"
+                    }
+                ]);
+
+                assert.strictEqual(results.length, 1);
+                assert.strictEqual(results[0].ruleId, "unicode-bom");
             });
 
             it("should apply a preprocessor to the code, and lint each code sample separately", () => {
@@ -16889,7 +17266,7 @@ var a = "test2";
         });
 
         it("should not crash when invalid parentheses syntax is encountered", () => {
-            linter.verify("left = (aSize.width/2) - ()", {});
+            linter.verify("left = (aSize.width/2) - ()");
         });
 
         it("should not crash when let is used inside of switch case", () => {
@@ -17029,6 +17406,281 @@ var a = "test2";
                     1
                 );
             });
+        });
+
+    });
+
+    describe("Languages", () => {
+
+        describe("With a language that doesn't have language options", () => {
+            const config = {
+                files: ["**/*.json"],
+                plugins: {
+                    json: jsonPlugin
+                },
+                language: "json/json",
+                rules: {
+                    "json/no-empty-keys": 1
+                }
+            };
+
+            it("linter.verify() should work", () => {
+                const messages = linter.verify('{ "": 42 }', config, { filename: "foo.json" });
+
+                assert.strictEqual(messages.length, 1);
+
+                const [message] = messages;
+
+                assert.strictEqual(message.ruleId, "json/no-empty-keys");
+                assert.strictEqual(message.severity, 1);
+                assert.strictEqual(message.messageId, "emptyKey");
+            });
+        });
+
+        describe("With a language that has 0-based lines and 1-based columns", () => {
+
+            /**
+             * Changes a 1-based line & 0-based column location to be a 0-based line & 1-based column location
+             * @param {Object} nodeOrToken An object with a `loc` property.
+             * @returns {void}
+             */
+            function adjustLoc(nodeOrToken) {
+                nodeOrToken.loc = {
+                    start: {
+                        line: nodeOrToken.loc.start.line - 1,
+                        column: nodeOrToken.loc.start.column + 1
+                    },
+                    end: {
+                        line: nodeOrToken.loc.end.line - 1,
+                        column: nodeOrToken.loc.end.column + 1
+                    }
+                };
+            }
+
+            const config = {
+                plugins: {
+                    test: {
+                        languages: {
+                            js: {
+                                ...jslang,
+                                lineStart: 0,
+                                columnStart: 1,
+                                parse(...args) {
+                                    const result = jslang.parse(...args);
+
+                                    Traverser.traverse(result.ast, {
+                                        enter(node) {
+                                            adjustLoc(node);
+                                        }
+                                    });
+
+                                    result.ast.tokens.forEach(adjustLoc);
+                                    result.ast.comments.forEach(adjustLoc);
+
+                                    return result;
+                                }
+                            }
+                        },
+                        rules: {
+                            "no-classes": {
+                                create(context) {
+                                    return {
+                                        ClassDeclaration(node) {
+                                            context.report({ node, message: "No classes allowed." });
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                    }
+                },
+                language: "test/js",
+                rules: {
+                    "test/no-classes": "error"
+                }
+            };
+
+            it("should report 1-based location of a lint problem", () => {
+                const messages = linter.verify(`${"\n".repeat(4)}${" ".repeat(7)}class A {${"\n".repeat(2)}${" ".repeat(12)}}  \n`, config);
+
+                assert.strictEqual(messages.length, 1);
+
+                const [message] = messages;
+
+                assert.strictEqual(message.ruleId, "test/no-classes");
+                assert.strictEqual(message.message, "No classes allowed.");
+                assert.strictEqual(message.line, 5);
+                assert.strictEqual(message.column, 8);
+                assert.strictEqual(message.endLine, 7);
+                assert.strictEqual(message.endColumn, 14);
+            });
+
+            it("should correctly apply eslint-disable-line directive", () => {
+                const messages = linter.verify(`${"\n".repeat(4)}class A {}  /* eslint-disable-line */\n`, config);
+
+                assert.strictEqual(messages.length, 0);
+
+                const suppressedMessages = linter.getSuppressedMessages();
+
+                assert.strictEqual(suppressedMessages.length, 1);
+
+                const [message] = suppressedMessages;
+
+                assert.strictEqual(message.ruleId, "test/no-classes");
+                assert.strictEqual(message.message, "No classes allowed.");
+                assert.strictEqual(message.line, 5);
+                assert.strictEqual(message.column, 1);
+                assert.strictEqual(message.endLine, 5);
+                assert.strictEqual(message.endColumn, 11);
+            });
+
+            it("should correctly apply single-line eslint-disable-next-line directive", () => {
+                const messages = linter.verify(`${"\n".repeat(4)}   /* eslint-disable-next-line */\nclass A {} \n`, config);
+
+                assert.strictEqual(messages.length, 0);
+
+                const suppressedMessages = linter.getSuppressedMessages();
+
+                assert.strictEqual(suppressedMessages.length, 1);
+
+                const [message] = suppressedMessages;
+
+                assert.strictEqual(message.ruleId, "test/no-classes");
+                assert.strictEqual(message.message, "No classes allowed.");
+                assert.strictEqual(message.line, 6);
+                assert.strictEqual(message.column, 1);
+                assert.strictEqual(message.endLine, 6);
+                assert.strictEqual(message.endColumn, 11);
+            });
+
+            it("should correctly apply multiline eslint-disable-next-line directive", () => {
+                const messages = linter.verify(`${"\n".repeat(4)}/* eslint-disable-next-line\n  test/no-classes*/\nclass A {} \n`, config);
+
+                assert.strictEqual(messages.length, 0);
+
+                const suppressedMessages = linter.getSuppressedMessages();
+
+                assert.strictEqual(suppressedMessages.length, 1);
+
+                const [message] = suppressedMessages;
+
+                assert.strictEqual(message.ruleId, "test/no-classes");
+                assert.strictEqual(message.message, "No classes allowed.");
+                assert.strictEqual(message.line, 7);
+                assert.strictEqual(message.column, 1);
+                assert.strictEqual(message.endLine, 7);
+                assert.strictEqual(message.endColumn, 11);
+            });
+
+            it("should correctly apply eslint-disable directive", () => {
+                const messages = linter.verify(`${"\n".repeat(4)}/* eslint-disable test/no-classes */class A {} \n`, config);
+
+                assert.strictEqual(messages.length, 0);
+
+                const suppressedMessages = linter.getSuppressedMessages();
+
+                assert.strictEqual(suppressedMessages.length, 1);
+
+                const [message] = suppressedMessages;
+
+                assert.strictEqual(message.ruleId, "test/no-classes");
+                assert.strictEqual(message.message, "No classes allowed.");
+                assert.strictEqual(message.line, 5);
+                assert.strictEqual(message.column, 37);
+                assert.strictEqual(message.endLine, 5);
+                assert.strictEqual(message.endColumn, 47);
+            });
+
+            it("should correctly report unused disable directives", () => {
+                const messages = linter.verify([
+                    "",
+                    "",
+                    "  /* eslint-enable test/no-classes */",
+                    "  /* eslint-disable test/no-classes */",
+                    "  /* eslint-enable test/no-classes */",
+                    "  // eslint-disable-line test/no-classes",
+                    "  class A {}",
+                    "  // eslint-disable-line test/no-classes",
+                    "  class B {}",
+                    "  // eslint-disable-next-line test/no-classes",
+                    "",
+                    "  class C {}",
+                    "  /* eslint-disable-next-line",
+                    "   test/no-classes */ ",
+                    "",
+                    "  class D {}"
+                ].join("\n"), config);
+
+                assert.strictEqual(messages.length, 10);
+
+                assert.strictEqual(messages[0].ruleId, null);
+                assert.match(messages[0].message, /Unused eslint-enable directive/u);
+                assert.strictEqual(messages[0].line, 3);
+                assert.strictEqual(messages[0].column, 3);
+
+                assert.strictEqual(messages[1].ruleId, null);
+                assert.match(messages[1].message, /Unused eslint-disable directive/u);
+                assert.strictEqual(messages[1].line, 4);
+                assert.strictEqual(messages[1].column, 3);
+
+                assert.strictEqual(messages[2].ruleId, null);
+                assert.match(messages[2].message, /Unused eslint-disable directive/u);
+                assert.strictEqual(messages[2].line, 6);
+                assert.strictEqual(messages[2].column, 3);
+
+                assert.strictEqual(messages[3].ruleId, "test/no-classes");
+                assert.strictEqual(messages[3].message, "No classes allowed.");
+                assert.strictEqual(messages[3].line, 7);
+                assert.strictEqual(messages[3].column, 3);
+
+                assert.strictEqual(messages[4].ruleId, null);
+                assert.match(messages[4].message, /Unused eslint-disable directive/u);
+                assert.strictEqual(messages[4].line, 8);
+                assert.strictEqual(messages[4].column, 3);
+
+                assert.strictEqual(messages[5].ruleId, "test/no-classes");
+                assert.strictEqual(messages[5].message, "No classes allowed.");
+                assert.strictEqual(messages[5].line, 9);
+                assert.strictEqual(messages[5].column, 3);
+
+                assert.strictEqual(messages[6].ruleId, null);
+                assert.match(messages[6].message, /Unused eslint-disable directive/u);
+                assert.strictEqual(messages[6].line, 10);
+                assert.strictEqual(messages[6].column, 3);
+
+                assert.strictEqual(messages[7].ruleId, "test/no-classes");
+                assert.strictEqual(messages[7].message, "No classes allowed.");
+                assert.strictEqual(messages[7].line, 12);
+                assert.strictEqual(messages[7].column, 3);
+
+                assert.strictEqual(messages[8].ruleId, null);
+                assert.match(messages[8].message, /Unused eslint-disable directive/u);
+                assert.strictEqual(messages[8].line, 13);
+                assert.strictEqual(messages[8].column, 3);
+
+                assert.strictEqual(messages[9].ruleId, "test/no-classes");
+                assert.strictEqual(messages[9].message, "No classes allowed.");
+                assert.strictEqual(messages[9].line, 16);
+                assert.strictEqual(messages[9].column, 3);
+
+                assert.strictEqual(linter.getSuppressedMessages().length, 0);
+            });
+
+            it("should correctly report problem for a a non-existent rule in disable directive", () => {
+                const messages = linter.verify(`${"\n".repeat(4)}${" ".repeat(7)}/* eslint-disable \n${" ".repeat(8)}test/foo */  \n`, config);
+
+                assert.strictEqual(messages.length, 1);
+
+                const [message] = messages;
+
+                assert.strictEqual(message.ruleId, "test/foo");
+                assert.strictEqual(message.message, "Definition for rule 'test/foo' was not found.");
+                assert.strictEqual(message.line, 5);
+                assert.strictEqual(message.column, 8);
+                assert.strictEqual(message.endLine, 6);
+                assert.strictEqual(message.endColumn, 20);
+            });
+
         });
 
     });

@@ -18,6 +18,10 @@ bar();
 ![Code Path Example](../assets/images/code-path-analysis/helo.svg)
 :::
 
+::: tip
+You can view code path diagrams for any JavaScript code using [Code Explorer](http://explorer.eslint.org).
+:::
+
 ## Objects
 
 Program is expressed with several code paths.
@@ -37,7 +41,6 @@ This has references of both the initial segment and the final segments of a code
 * `finalSegments` (`CodePathSegment[]`) - The final segments which includes both returned and thrown.
 * `returnedSegments` (`CodePathSegment[]`) - The final segments which includes only returned.
 * `thrownSegments` (`CodePathSegment[]`) - The final segments which includes only thrown.
-* `currentSegments` (`CodePathSegment[]`) - **Deprecated.** Segments of the current traversal position.
 * `upper` (`CodePath|null`) - The code path of the upper function/global scope.
 * `childCodePaths` (`CodePath[]`) - Code paths of functions this code path contains.
 
@@ -635,7 +638,7 @@ last();
 ```
 
 If there is not `catch` block, `finally` block has two current segments.
-At this time, `CodePath.currentSegments.length` is `2`.
+At this time when running the previous example to find unreachable nodes, `currentSegments.length` is `2`.
 One is the normal path, and another is the leaving path (`throw` or `return`).
 
 :::img-container
