@@ -12,7 +12,7 @@ further_reading:
 JavaScript's `eval()` function is potentially dangerous and is often misused. Using `eval()` on untrusted code can open a program up to several different injection attacks. The use of `eval()` in most contexts can be substituted for a better, alternative approach to a problem.
 
 ```js
-var obj = { x: "foo" },
+const obj = { x: "foo" },
     key = "x",
     value = eval("obj." + key);
 ```
@@ -23,68 +23,67 @@ This rule is aimed at preventing potentially dangerous, unnecessary, and slow co
 
 Examples of **incorrect** code for this rule:
 
-::: incorrect
+::: incorrect { "sourceType": "script" }
 
 ```js
 /*eslint no-eval: "error"*/
 
-var obj = { x: "foo" },
+const obj = { x: "foo" },
     key = "x",
     value = eval("obj." + key);
 
-(0, eval)("var a = 0");
+(0, eval)("const a = 0");
 
-var foo = eval;
-foo("var a = 0");
+const foo = eval;
+foo("const a = 0");
 
 // This `this` is the global object.
-this.eval("var a = 0");
+this.eval("const a = 0");
 ```
 
 :::
 
-Example of additional **incorrect** code for this rule when `browser` environment is set to `true`:
+Example of additional **incorrect** code for this rule with `window` global variable:
 
 ::: incorrect
 
 ```js
 /*eslint no-eval: "error"*/
-/*eslint-env browser*/
+/*global window*/
 
-window.eval("var a = 0");
+window.eval("const a = 0");
 ```
 
 :::
 
-Example of additional **incorrect** code for this rule when `node` environment is set to `true`:
+Example of additional **incorrect** code for this rule with `global` global variable:
 
 ::: incorrect
 
 ```js
 /*eslint no-eval: "error"*/
-/*eslint-env node*/
+/*global global*/
 
-global.eval("var a = 0");
+global.eval("const a = 0");
 ```
 
 :::
 
 Examples of **correct** code for this rule:
 
-::: correct
+::: correct { "sourceType": "script" }
 
 ```js
 /*eslint no-eval: "error"*/
-/*eslint-env es6*/
 
-var obj = { x: "foo" },
+const obj = { x: "foo" },
     key = "x",
     value = obj[key];
 
 class A {
     foo() {
         // This is a user-defined method.
-        this.eval("var a = 0");
+        this.eval("const a = 0");
     }
 
     eval() {
@@ -92,7 +91,7 @@ class A {
 
     static {
         // This is a user-defined static method.
-        this.eval("var a = 0");
+        this.eval("const a = 0");
     }
 
     static eval() {
@@ -104,7 +103,9 @@ class A {
 
 ## Options
 
-This rule has an option to allow indirect calls to `eval`.
+### allowIndirect
+
+This rule has an option to allow ["indirect eval"](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#direct_and_indirect_eval).
 Indirect calls to `eval` are less dangerous than direct calls to `eval` because they cannot dynamically change the scope. Because of this, they also will not negatively impact performance to the degree of direct `eval`.
 
 ```js
@@ -118,9 +119,9 @@ Example of **incorrect** code for this rule with the `{"allowIndirect": true}` o
 ::: incorrect
 
 ```js
-/*eslint no-eval: "error"*/
+/*eslint no-eval: ["error", {"allowIndirect": true} ]*/
 
-var obj = { x: "foo" },
+const obj = { x: "foo" },
     key = "x",
     value = eval("obj." + key);
 ```
@@ -129,17 +130,17 @@ var obj = { x: "foo" },
 
 Examples of **correct** code for this rule with the `{"allowIndirect": true}` option:
 
-::: correct
+::: correct { "sourceType": "script" }
 
 ```js
-/*eslint no-eval: "error"*/
+/*eslint no-eval: ["error", {"allowIndirect": true} ]*/
 
-(0, eval)("var a = 0");
+(0, eval)("const a = 0");
 
-var foo = eval;
-foo("var a = 0");
+const foo = eval;
+foo("const a = 0");
 
-this.eval("var a = 0");
+this.eval("const a = 0");
 ```
 
 :::
@@ -147,10 +148,10 @@ this.eval("var a = 0");
 ::: correct
 
 ```js
-/*eslint no-eval: "error"*/
-/*eslint-env browser*/
+/*eslint no-eval: ["error", {"allowIndirect": true} ]*/
+/*global window*/
 
-window.eval("var a = 0");
+window.eval("const a = 0");
 ```
 
 :::
@@ -158,10 +159,10 @@ window.eval("var a = 0");
 ::: correct
 
 ```js
-/*eslint no-eval: "error"*/
-/*eslint-env node*/
+/*eslint no-eval: ["error", {"allowIndirect": true} ]*/
+/*global global*/
 
-global.eval("var a = 0");
+global.eval("const a = 0");
 ```
 
 :::
@@ -175,13 +176,13 @@ global.eval("var a = 0");
   module.exports = function(eval) {
       // If the value of this `eval` is built-in `eval` function, this is a
       // call of direct `eval`.
-      eval("var a = 0");
+      eval("const a = 0");
   };
   ```
 
 * This rule cannot catch renaming the global object. Such as:
 
   ```js
-  var foo = window;
-  foo.eval("var a = 0");
+  const foo = window;
+  foo.eval("const a = 0");
   ```

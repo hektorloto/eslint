@@ -10,14 +10,15 @@
 //------------------------------------------------------------------------------
 
 const rule = require("../../../lib/rules/require-unicode-regexp");
-const { RuleTester } = require("../../../lib/rule-tester");
+const RuleTester = require("../../../lib/rule-tester/rule-tester");
+const globals = require("globals");
 
 //------------------------------------------------------------------------------
 // Tests
 //------------------------------------------------------------------------------
 
 const ruleTester = new RuleTester({
-    parserOptions: { ecmaVersion: 2015 }
+    languageOptions: { ecmaVersion: 2015 }
 });
 
 ruleTester.run("require-unicode-regexp", rule, {
@@ -38,27 +39,31 @@ ruleTester.run("require-unicode-regexp", rule, {
         "function f(flags) { return new RegExp('', flags) }",
         "function f(RegExp) { return new RegExp('foo') }",
         "function f(patternAndFlags) { return new RegExp(...patternAndFlags) }",
-        { code: "new globalThis.RegExp('foo')", env: { es6: true } },
-        { code: "new globalThis.RegExp('foo')", env: { es2017: true } },
-        { code: "new globalThis.RegExp('foo', 'u')", env: { es2020: true } },
-        { code: "globalThis.RegExp('foo', 'u')", env: { es2020: true } },
-        { code: "const flags = 'u'; new globalThis.RegExp('', flags)", env: { es2020: true } },
-        { code: "const flags = 'g'; new globalThis.RegExp('', flags + 'u')", env: { es2020: true } },
-        { code: "const flags = 'gimu'; new globalThis.RegExp('foo', flags[3])", env: { es2020: true } },
-        { code: "class C { #RegExp; foo() { new globalThis.#RegExp('foo') } }", parserOptions: { ecmaVersion: 2022 }, env: { es2020: true } },
+        { code: "new globalThis.RegExp('foo')", languageOptions: { ecmaVersion: 6 } },
+        { code: "new globalThis.RegExp('foo')", languageOptions: { ecmaVersion: 2017 } },
+        { code: "new globalThis.RegExp('foo', 'u')", languageOptions: { ecmaVersion: 2020 } },
+        { code: "globalThis.RegExp('foo', 'u')", languageOptions: { ecmaVersion: 2020 } },
+        { code: "const flags = 'u'; new globalThis.RegExp('', flags)", languageOptions: { ecmaVersion: 2020 } },
+        { code: "const flags = 'g'; new globalThis.RegExp('', flags + 'u')", languageOptions: { ecmaVersion: 2020 } },
+        { code: "const flags = 'gimu'; new globalThis.RegExp('foo', flags[3])", languageOptions: { ecmaVersion: 2020 } },
+        { code: "class C { #RegExp; foo() { new globalThis.#RegExp('foo') } }", languageOptions: { ecmaVersion: 2022 } },
+        { code: "/foo/u", options: [{ requireFlag: "u" }] },
+        { code: "new RegExp('foo', 'u')", options: [{ requireFlag: "u" }] },
 
         // for v flag
-        { code: "/foo/v", parserOptions: { ecmaVersion: 2024 } },
-        { code: "/foo/gimvy", parserOptions: { ecmaVersion: 2024 } },
-        { code: "RegExp('', 'v')", parserOptions: { ecmaVersion: 2024 } },
-        { code: "RegExp('', `v`)", parserOptions: { ecmaVersion: 2024 } },
-        { code: "new RegExp('', 'v')", parserOptions: { ecmaVersion: 2024 } },
-        { code: "RegExp('', 'gimvy')", parserOptions: { ecmaVersion: 2024 } },
-        { code: "RegExp('', `gimvy`)", parserOptions: { ecmaVersion: 2024 } },
-        { code: "new RegExp('', 'gimvy')", parserOptions: { ecmaVersion: 2024 } },
-        { code: "const flags = 'v'; new RegExp('', flags)", parserOptions: { ecmaVersion: 2024 } },
-        { code: "const flags = 'g'; new RegExp('', flags + 'v')", parserOptions: { ecmaVersion: 2024 } },
-        { code: "const flags = 'gimv'; new RegExp('foo', flags[3])", parserOptions: { ecmaVersion: 2024 } }
+        { code: "/foo/v", languageOptions: { ecmaVersion: 2024 } },
+        { code: "/foo/gimvy", languageOptions: { ecmaVersion: 2024 } },
+        { code: "RegExp('', 'v')", languageOptions: { ecmaVersion: 2024 } },
+        { code: "RegExp('', `v`)", languageOptions: { ecmaVersion: 2024 } },
+        { code: "new RegExp('', 'v')", languageOptions: { ecmaVersion: 2024 } },
+        { code: "RegExp('', 'gimvy')", languageOptions: { ecmaVersion: 2024 } },
+        { code: "RegExp('', `gimvy`)", languageOptions: { ecmaVersion: 2024 } },
+        { code: "new RegExp('', 'gimvy')", languageOptions: { ecmaVersion: 2024 } },
+        { code: "const flags = 'v'; new RegExp('', flags)", languageOptions: { ecmaVersion: 2024 } },
+        { code: "const flags = 'g'; new RegExp('', flags + 'v')", languageOptions: { ecmaVersion: 2024 } },
+        { code: "const flags = 'gimv'; new RegExp('foo', flags[3])", languageOptions: { ecmaVersion: 2024 } },
+        { code: "/foo/v", options: [{ requireFlag: "v" }], languageOptions: { ecmaVersion: 2024 } },
+        { code: "new RegExp('foo', 'v')", options: [{ requireFlag: "v" }], languageOptions: { ecmaVersion: 2024 } }
     ],
     invalid: [
         {
@@ -167,6 +172,21 @@ ruleTester.run("require-unicode-regexp", rule, {
             }]
         },
         {
+            code: "new RegExp('foo',)",
+            languageOptions: {
+                ecmaVersion: 2017
+            },
+            errors: [{
+                messageId: "requireUFlag",
+                suggestions: [
+                    {
+                        messageId: "addUFlag",
+                        output: "new RegExp('foo', \"u\",)"
+                    }
+                ]
+            }]
+        },
+        {
             code: "new RegExp('foo', false)",
             errors: [{
                 messageId: "requireUFlag",
@@ -265,7 +285,7 @@ ruleTester.run("require-unicode-regexp", rule, {
         },
         {
             code: "new window.RegExp('foo')",
-            env: { browser: true },
+            languageOptions: { globals: globals.browser },
             errors: [{
                 messageId: "requireUFlag",
                 suggestions: [
@@ -278,7 +298,7 @@ ruleTester.run("require-unicode-regexp", rule, {
         },
         {
             code: "new global.RegExp('foo')",
-            env: { node: true },
+            languageOptions: { sourceType: "commonjs" },
             errors: [{
                 messageId: "requireUFlag",
                 suggestions: [
@@ -291,13 +311,193 @@ ruleTester.run("require-unicode-regexp", rule, {
         },
         {
             code: "new globalThis.RegExp('foo')",
-            env: { es2020: true },
+            languageOptions: { ecmaVersion: 2020 },
             errors: [{
                 messageId: "requireUFlag",
                 suggestions: [
                     {
                         messageId: "addUFlag",
                         output: "new globalThis.RegExp('foo', \"u\")"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "/foo/",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "/foo/v"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "/foo/u",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "/foo/v"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "/foo/u",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 6 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: null
+            }]
+        },
+        {
+            code: "/[[a]/u",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: null
+            }]
+        },
+        {
+            code: "new RegExp('foo', 'u')",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "new RegExp('foo', 'v')"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "new RegExp('[[a]', 'u')",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: null
+            }]
+        },
+        {
+            code: "new RegExp(\"foo\", \"\\u0067\")",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "new RegExp(\"foo\", \"\\u0067v\")"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "new RegExp(\"foo\", `\\u0067`)",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "new RegExp(\"foo\", `\\u0067v`)"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "new RegExp(\"foo\", \"\\u0075\")",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: null
+            }]
+        },
+        {
+            code: "new RegExp(\"foo\", `\\u0075`)",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: null
+            }]
+        },
+        {
+            code: "const regularFlags = \"sm\"; new RegExp(\"foo\", `${regularFlags}g`)",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "const regularFlags = \"sm\"; new RegExp(\"foo\", `${regularFlags}gv`)"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "const regularFlags = \"smu\"; new RegExp(\"foo\", `${regularFlags}g`)",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: null
+            }]
+        },
+        {
+            code: "/foo/v",
+            options: [{ requireFlag: "u" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireUFlag",
+                suggestions: [
+                    {
+                        messageId: "addUFlag",
+                        output: "/foo/u"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "new RegExp('foo')",
+            options: [{ requireFlag: "v" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireVFlag",
+                suggestions: [
+                    {
+                        messageId: "addVFlag",
+                        output: "new RegExp('foo', \"v\")"
+                    }
+                ]
+            }]
+        },
+        {
+            code: "new RegExp('foo', 'v')",
+            options: [{ requireFlag: "u" }],
+            languageOptions: { ecmaVersion: 2024 },
+            errors: [{
+                messageId: "requireUFlag",
+                suggestions: [
+                    {
+                        messageId: "addUFlag",
+                        output: "new RegExp('foo', 'u')"
                     }
                 ]
             }]

@@ -9,7 +9,7 @@
 // Requirements
 //------------------------------------------------------------------------------
 const rule = require("../../../lib/rules/consistent-this"),
-    { RuleTester } = require("../../../lib/rule-tester");
+    RuleTester = require("../../../lib/rule-tester/rule-tester");
 
 //------------------------------------------------------------------------------
 // Helpers
@@ -25,8 +25,7 @@ function destructuringTest(code) {
     return {
         code,
         options: ["self"],
-        env: { es6: true },
-        parserOptions: { ecmaVersion: 6 }
+        languageOptions: { ecmaVersion: 6 }
     };
 }
 
@@ -34,7 +33,12 @@ function destructuringTest(code) {
 // Tests
 //------------------------------------------------------------------------------
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({
+    languageOptions: {
+        ecmaVersion: 5,
+        sourceType: "script"
+    }
+});
 
 ruleTester.run("consistent-this", rule, {
     valid: [
@@ -64,6 +68,7 @@ ruleTester.run("consistent-this", rule, {
         { code: "that = this", options: ["self"], errors: [{ messageId: "unexpectedAlias", data: { name: "that" }, type: "AssignmentExpression" }] },
         { code: "self = this", options: ["that"], errors: [{ messageId: "unexpectedAlias", data: { name: "self" }, type: "AssignmentExpression" }] },
         { code: "self += this", options: ["self"], errors: [{ messageId: "aliasNotAssignedToThis", data: { name: "self" }, type: "AssignmentExpression" }] },
-        { code: "var self; (function() { self = this; }())", options: ["self"], errors: [{ messageId: "aliasNotAssignedToThis", data: { name: "self" }, type: "VariableDeclarator" }] }
+        { code: "var self; (function() { self = this; }())", options: ["self"], errors: [{ messageId: "aliasNotAssignedToThis", data: { name: "self" }, type: "VariableDeclarator" }] },
+        { code: "var self; (function() { self = this; }())", options: ["self"], languageOptions: { ecmaVersion: 6, sourceType: "module" }, errors: [{ messageId: "aliasNotAssignedToThis", data: { name: "self" }, type: "VariableDeclarator" }] }
     ]
 });

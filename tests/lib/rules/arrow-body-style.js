@@ -9,13 +9,13 @@
 //------------------------------------------------------------------------------
 
 const rule = require("../../../lib/rules/arrow-body-style"),
-    { RuleTester } = require("../../../lib/rule-tester");
+    RuleTester = require("../../../lib/rule-tester/rule-tester");
 
 //------------------------------------------------------------------------------
 // Tests
 //------------------------------------------------------------------------------
 
-const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 6 } });
+const ruleTester = new RuleTester({ languageOptions: { ecmaVersion: 6 } });
 
 ruleTester.run("arrow-body-style", rule, {
     valid: [
@@ -532,6 +532,14 @@ ruleTester.run("arrow-body-style", rule, {
             options: ["never"],
             errors: [
                 { line: 1, column: 27, type: "ArrowFunctionExpression", messageId: "unexpectedOtherBlock" }
+            ]
+        },
+        {
+            code: "var foo = () => { bar };",
+            output: null, // not fixed
+            options: ["never"],
+            errors: [
+                { line: 1, column: 17, type: "ArrowFunctionExpression", messageId: "unexpectedOtherBlock" }
             ]
         },
         {

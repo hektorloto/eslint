@@ -17,6 +17,7 @@ Rules in ESLint are grouped by type to help you understand their purpose. Each r
         index: true,
         recommended: true,
         fixable: true,
+        frozen: true,
         hasSuggestions: true
 }) }}
 
@@ -35,6 +36,7 @@ Rules in ESLint are grouped by type to help you understand their purpose. Each r
     {%- set name_value = the_rule.name -%}
     {%- set description_value = the_rule.description -%}
     {%- set isRecommended = the_rule.recommended -%}
+    {%- set isFrozen = the_rule.frozen -%}
     {%- set isFixable = the_rule.fixable -%}
     {%- set isHasSuggestions = the_rule.hasSuggestions -%}
 
@@ -45,6 +47,7 @@ Rules in ESLint are grouped by type to help you understand their purpose. Each r
             categories: {
                 recommended: isRecommended,
                 fixable: isFixable,
+                frozen: isFrozen,
                 hasSuggestions: isHasSuggestions
             }
     }) }}
@@ -60,11 +63,19 @@ Rules in ESLint are grouped by type to help you understand their purpose. Each r
 {%- for the_rule in rules.deprecated -%}
     {%- set name_value = the_rule.name -%}
     {%- set isReplacedBy = the_rule.replacedBy -%}
+    {%- set isRecommended = the_rule.recommended -%}
+    {%- set isFixable = the_rule.fixable -%}
+    {%- set isHasSuggestions = the_rule.hasSuggestions -%}
 
     {{ rule({
             name: name_value,
             deprecated: true,
-            replacedBy: isReplacedBy
+            replacedBy: isReplacedBy,
+            categories: {
+                recommended: isRecommended,
+                fixable: isFixable,
+                hasSuggestions: isHasSuggestions
+            }
     }) }}
 {%- endfor -%}
 {%- endif -%}

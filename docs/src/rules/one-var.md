@@ -347,7 +347,6 @@ Examples of **incorrect** code for this rule with the `{ var: "always", let: "ne
 
 ```js
 /*eslint one-var: ["error", { var: "always", let: "never", const: "never" }]*/
-/*eslint-env es6*/
 
 function foo1() {
     var bar;
@@ -372,7 +371,6 @@ Examples of **correct** code for this rule with the `{ var: "always", let: "neve
 
 ```js
 /*eslint one-var: ["error", { var: "always", let: "never", const: "never" }]*/
-/*eslint-env es6*/
 
 function foo1() {
     var bar,
@@ -397,7 +395,6 @@ Examples of **incorrect** code for this rule with the `{ var: "never" }` option:
 
 ```js
 /*eslint one-var: ["error", { var: "never" }]*/
-/*eslint-env es6*/
 
 function foo() {
     var bar,
@@ -413,7 +410,6 @@ Examples of **correct** code for this rule with the `{ var: "never" }` option:
 
 ```js
 /*eslint one-var: ["error", { var: "never" }]*/
-/*eslint-env es6*/
 
 function foo() {
     var bar;
@@ -437,7 +433,6 @@ Examples of **incorrect** code for this rule with the `{ separateRequires: true 
 
 ```js
 /*eslint one-var: ["error", { separateRequires: true, var: "always" }]*/
-/*eslint-env node*/
 
 var foo = require("foo"),
     bar = "bar";
@@ -451,7 +446,6 @@ Examples of **correct** code for this rule with the `{ separateRequires: true }`
 
 ```js
 /*eslint one-var: ["error", { separateRequires: true, var: "always" }]*/
-/*eslint-env node*/
 
 var foo = require("foo");
 var bar = "bar";
@@ -462,6 +456,8 @@ var bar = "bar";
 ::: correct
 
 ```js
+/*eslint one-var: ["error", { separateRequires: true, var: "always" }]*/
+
 var foo = require("foo"),
     bar = require("bar");
 ```
@@ -474,7 +470,6 @@ Examples of **incorrect** code for this rule with the `{ var: "never", let: "con
 
 ```js
 /*eslint one-var: ["error", { var: "never", let: "consecutive", const: "consecutive" }]*/
-/*eslint-env es6*/
 
 function foo1() {
     let a,
@@ -503,7 +498,6 @@ Examples of **correct** code for this rule with the `{ var: "never", let: "conse
 
 ```js
 /*eslint one-var: ["error", { var: "never", let: "consecutive", const: "consecutive" }]*/
-/*eslint-env es6*/
 
 function foo1() {
     let a,
@@ -534,7 +528,6 @@ Examples of **incorrect** code for this rule with the `{ var: "consecutive" }` o
 
 ```js
 /*eslint one-var: ["error", { var: "consecutive" }]*/
-/*eslint-env es6*/
 
 function foo() {
     var a;
@@ -550,7 +543,6 @@ Examples of **correct** code for this rule with the `{ var: "consecutive" }` opt
 
 ```js
 /*eslint one-var: ["error", { var: "consecutive" }]*/
-/*eslint-env es6*/
 
 function foo() {
     var a,
@@ -572,7 +564,6 @@ Examples of **incorrect** code for this rule with the `{ "initialized": "always"
 
 ```js
 /*eslint one-var: ["error", { "initialized": "always", "uninitialized": "never" }]*/
-/*eslint-env es6*/
 
 function foo() {
     var a, b, c;
@@ -616,7 +607,6 @@ Examples of **incorrect** code for this rule with the `{ "initialized": "never" 
 
 ```js
 /*eslint one-var: ["error", { "initialized": "never" }]*/
-/*eslint-env es6*/
 
 function foo() {
     var foo = true,

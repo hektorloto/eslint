@@ -9,7 +9,7 @@
 //------------------------------------------------------------------------------
 
 const rule = require("../../../lib/rules/multiline-comment-style");
-const { RuleTester } = require("../../../lib/rule-tester");
+const RuleTester = require("../../../lib/rule-tester/rule-tester");
 
 //------------------------------------------------------------------------------
 // Tests
@@ -1260,20 +1260,6 @@ ${"                   "}
                  */
             `,
             options: ["starred-block"],
-            errors: [{ messageId: "expectedBlock", line: 2 }]
-        },
-        {
-            code: `
-                // foo
-                //
-                // bar
-            `,
-            output: `
-                /* foo
-${"                   "}
-                   bar */
-            `,
-            options: ["bare-block"],
             errors: [{ messageId: "expectedBlock", line: 2 }]
         },
         {

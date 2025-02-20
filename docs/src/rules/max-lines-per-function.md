@@ -72,64 +72,52 @@ is equivalent to
 
 ### code
 
-Examples of **incorrect** code for this rule with a max value of `2`:
+Examples of **incorrect** code for this rule with a particular max value:
 
 ::: incorrect
 
 ```js
 /*eslint max-lines-per-function: ["error", 2]*/
 function foo() {
-    var x = 0;
+    const x = 0;
 }
 ```
 
 :::
 
 ::: incorrect
-
-```js
-/*eslint max-lines-per-function: ["error", 2]*/
-function foo() {
-    // a comment
-    var x = 0;
-}
-```
-
-:::
-
-::: incorrect
-
-```js
-/*eslint max-lines-per-function: ["error", 2]*/
-function foo() {
-    // a comment followed by a blank line
-
-    var x = 0;
-}
-```
-
-:::
-
-Examples of **correct** code for this rule with a max value of `3`:
-
-::: correct
-
-```js
-/*eslint max-lines-per-function: ["error", 3]*/
-function foo() {
-    var x = 0;
-}
-```
-
-:::
-
-::: correct
 
 ```js
 /*eslint max-lines-per-function: ["error", 3]*/
 function foo() {
     // a comment
-    var x = 0;
+    const x = 0;
+}
+```
+
+:::
+
+::: incorrect
+
+```js
+/*eslint max-lines-per-function: ["error", 4]*/
+function foo() {
+    // a comment followed by a blank line
+
+    const x = 0;
+}
+```
+
+:::
+
+Examples of **correct** code for this rule with a particular max value:
+
+::: correct
+
+```js
+/*eslint max-lines-per-function: ["error", 3]*/
+function foo() {
+    const x = 0;
 }
 ```
 
@@ -138,11 +126,23 @@ function foo() {
 ::: correct
 
 ```js
-/*eslint max-lines-per-function: ["error", 3]*/
+/*eslint max-lines-per-function: ["error", 4]*/
+function foo() {
+    // a comment
+    const x = 0;
+}
+```
+
+:::
+
+::: correct
+
+```js
+/*eslint max-lines-per-function: ["error", 5]*/
 function foo() {
     // a comment followed by a blank line
 
-    var x = 0;
+    const x = 0;
 }
 ```
 
@@ -158,7 +158,7 @@ Examples of **incorrect** code for this rule with the `{ "skipBlankLines": true 
 /*eslint max-lines-per-function: ["error", {"max": 2, "skipBlankLines": true}]*/
 function foo() {
 
-    var x = 0;
+    const x = 0;
 }
 ```
 
@@ -172,7 +172,7 @@ Examples of **correct** code for this rule with the `{ "skipBlankLines": true }`
 /*eslint max-lines-per-function: ["error", {"max": 3, "skipBlankLines": true}]*/
 function foo() {
 
-    var x = 0;
+    const x = 0;
 }
 ```
 
@@ -188,7 +188,7 @@ Examples of **incorrect** code for this rule with the `{ "skipComments": true }`
 /*eslint max-lines-per-function: ["error", {"max": 2, "skipComments": true}]*/
 function foo() {
     // a comment
-    var x = 0;
+    const x = 0;
 }
 ```
 
@@ -202,7 +202,7 @@ Examples of **correct** code for this rule with the `{ "skipComments": true }` o
 /*eslint max-lines-per-function: ["error", {"max": 3, "skipComments": true}]*/
 function foo() {
     // a comment
-    var x = 0;
+    const x = 0;
 }
 ```
 
@@ -217,11 +217,11 @@ Examples of **incorrect** code for this rule with the `{ "IIFEs": true }` option
 ```js
 /*eslint max-lines-per-function: ["error", {"max": 2, "IIFEs": true}]*/
 (function(){
-    var x = 0;
+    const x = 0;
 }());
 
 (() => {
-    var x = 0;
+    const x = 0;
 })();
 ```
 
@@ -234,11 +234,11 @@ Examples of **correct** code for this rule with the `{ "IIFEs": true }` option:
 ```js
 /*eslint max-lines-per-function: ["error", {"max": 3, "IIFEs": true}]*/
 (function(){
-    var x = 0;
+    const x = 0;
 }());
 
 (() => {
-    var x = 0;
+    const x = 0;
 })();
 ```
 

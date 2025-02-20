@@ -69,10 +69,10 @@ describe("options", () => {
 
             describe("--format", () => {
                 it("should return a string for .format when passed a string", () => {
-                    const currentOptions = options.parse("--format compact");
+                    const currentOptions = options.parse("--format json");
 
                     assert.isString(currentOptions.format);
-                    assert.strictEqual(currentOptions.format, "compact");
+                    assert.strictEqual(currentOptions.format, "json");
                 });
 
                 it("should return stylish for .format when not passed", () => {
@@ -85,10 +85,10 @@ describe("options", () => {
 
             describe("-f", () => {
                 it("should return a string for .format when passed a string", () => {
-                    const currentOptions = options.parse("-f compact");
+                    const currentOptions = options.parse("-f json");
 
                     assert.isString(currentOptions.format);
-                    assert.strictEqual(currentOptions.format, "compact");
+                    assert.strictEqual(currentOptions.format, "json");
                 });
             });
 
@@ -318,40 +318,39 @@ describe("options", () => {
                     assert.strictEqual(currentOptions.printConfig, "file.js");
                 });
             });
+
+            describe("--ext", () => {
+                it("should return an array with one item when passed .jsx", () => {
+                    const currentOptions = options.parse("--ext .jsx");
+
+                    assert.isArray(currentOptions.ext);
+                    assert.strictEqual(currentOptions.ext[0], ".jsx");
+                });
+
+                it("should return an array with two items when passed .js and .jsx", () => {
+                    const currentOptions = options.parse("--ext .jsx --ext .js");
+
+                    assert.isArray(currentOptions.ext);
+                    assert.strictEqual(currentOptions.ext[0], ".jsx");
+                    assert.strictEqual(currentOptions.ext[1], ".js");
+                });
+
+                it("should return an array with two items when passed .jsx,.js", () => {
+                    const currentOptions = options.parse("--ext .jsx,.js");
+
+                    assert.isArray(currentOptions.ext);
+                    assert.strictEqual(currentOptions.ext[0], ".jsx");
+                    assert.strictEqual(currentOptions.ext[1], ".js");
+                });
+
+                it("should not exist when not passed", () => {
+                    const currentOptions = options.parse("");
+
+                    assert.notProperty(currentOptions, "ext");
+                });
+            });
         });
 
-    });
-
-
-    describe("--ext", () => {
-        it("should return an array with one item when passed .jsx", () => {
-            const currentOptions = eslintrcOptions.parse("--ext .jsx");
-
-            assert.isArray(currentOptions.ext);
-            assert.strictEqual(currentOptions.ext[0], ".jsx");
-        });
-
-        it("should return an array with two items when passed .js and .jsx", () => {
-            const currentOptions = eslintrcOptions.parse("--ext .jsx --ext .js");
-
-            assert.isArray(currentOptions.ext);
-            assert.strictEqual(currentOptions.ext[0], ".jsx");
-            assert.strictEqual(currentOptions.ext[1], ".js");
-        });
-
-        it("should return an array with two items when passed .jsx,.js", () => {
-            const currentOptions = eslintrcOptions.parse("--ext .jsx,.js");
-
-            assert.isArray(currentOptions.ext);
-            assert.strictEqual(currentOptions.ext[0], ".jsx");
-            assert.strictEqual(currentOptions.ext[1], ".js");
-        });
-
-        it("should not exist when not passed", () => {
-            const currentOptions = eslintrcOptions.parse("");
-
-            assert.notProperty(currentOptions, "ext");
-        });
     });
 
     describe("--rulesdir", () => {
@@ -408,10 +407,18 @@ describe("options", () => {
     });
 
     describe("--no-config-lookup", () => {
-        it("should return a string for .rulesdir when passed a string", () => {
+        it("should return a boolean for .configLookup when passed a string", () => {
             const currentOptions = flatOptions.parse("--no-config-lookup foo.js");
 
             assert.isFalse(currentOptions.configLookup);
+        });
+    });
+
+    describe("--pass-on-no-patterns", () => {
+        it("should return a boolean for .passOnNoPatterns when passed a string", () => {
+            const currentOptions = flatOptions.parse("--pass-on-no-patterns");
+
+            assert.isTrue(currentOptions.passOnNoPatterns);
         });
     });
 
@@ -426,6 +433,36 @@ describe("options", () => {
             const currentOptions = flatOptions.parse("--warn-ignored");
 
             assert.isTrue(currentOptions.warnIgnored);
+        });
+    });
+
+    describe("--stats", () => {
+        it("should return true --stats is passed", () => {
+            const currentOptions = flatOptions.parse("--stats");
+
+            assert.isTrue(currentOptions.stats);
+        });
+    });
+
+    describe("--inspect-config", () => {
+        it("should return true when --inspect-config is passed", () => {
+            const currentOptions = flatOptions.parse("--inspect-config");
+
+            assert.isTrue(currentOptions.inspectConfig);
+        });
+    });
+
+    describe("--flag", () => {
+        it("should return single-item array when --flag is passed once", () => {
+            const currentOptions = flatOptions.parse("--flag x_feature");
+
+            assert.deepStrictEqual(currentOptions.flag, ["x_feature"]);
+        });
+
+        it("should return multi-item array when --flag is passed multiple times", () => {
+            const currentOptions = flatOptions.parse("--flag x_feature --flag y_feature");
+
+            assert.deepStrictEqual(currentOptions.flag, ["x_feature", "y_feature"]);
         });
     });
 
